@@ -1,0 +1,24 @@
+# マイクデバイス
+# null = システムデフォルトを使用
+# 文字列 = 部分一致でデバイスを検索（IDではなく名前で指定することで抜き差しに強くする）
+device_name: null
+# device_name: "USB Audio"
+
+# 録音設定
+sample_rate: 16000          # Whisper推奨値
+channels: 1                 # モノラル（音声認識に十分）
+memo_max_duration: 300      # メモモード最大録音秒数（安全装置）
+
+# 保存先
+save_dir: "~/voice-memo/data"
+
+# Web UIサーバー
+server_port: 8765
+open_browser: true          # false にするとブラウザを自動で開かない
+
+# Whisper設定
+whisper_model: "small"      # tiny / base / small / medium / large
+whisper_language: "ja"      # 明示することで精度向上・高速化
+whisper_device: "cpu"       # cpu / cuda
+whisper_prompt: ""          # 専門用語を渡すプロンプト
+                            # 例: "ロボット実験の音声メモ。ROS、IMU、ヨー角などの用語が含まれる。"
