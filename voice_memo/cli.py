@@ -180,8 +180,32 @@ def transcribe() -> None:
 
 @main.command()
 def setup() -> None:
-    """初期セットアップ（未実装）"""
-    click.echo("未実装")
+    """初期セットアップ"""
+    import shutil
+
+    click.echo("セットアップを開始します...")
+
+    base_dir = Path("~/voice-memo").expanduser()
+    data_dir = base_dir / "data"
+    for sub in ("audio", "meta"):
+        (data_dir / sub).mkdir(parents=True, exist_ok=True)
+    (base_dir / "logs").mkdir(parents=True, exist_ok=True)
+    click.echo(f"  データディレクトリを作成: {data_dir}/")
+
+    config_dest = base_dir / "config.yaml"
+    if not config_dest.exists():
+        repo_config = Path(__file__).parent.parent / "config.yaml"
+        if repo_config.exists():
+            shutil.copy(str(repo_config), str(config_dest))
+            click.echo(f"  設定ファイルをコピー: {config_dest}")
+        else:
+            click.echo("  警告: リポジトリの config.yaml が見つかりません。スキップします。", err=True)
+
+    # faster-whisper モデルのダウンロードは Phase 5 で実装
+    click.echo("  モデルのダウンロード: Phase 5 で実装されます")
+
+    click.echo("セットアップが完了しました。")
+    click.echo("  次のステップ: vmemo record で録音を開始できます")
 
 
 @main.command()
