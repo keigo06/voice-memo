@@ -51,7 +51,9 @@ def record() -> None:
     ticker.start()
 
     # SIGTERM でも stop_event を立てて finally に落とす
-    signal.signal(signal.SIGTERM, lambda *_: recorder.stop_event.set())
+    # Windows では SIGTERM が利用できないため、Linux/Mac のみ登録する
+    if sys.platform != "win32":
+        signal.signal(signal.SIGTERM, lambda *_: recorder.stop_event.set())
 
     try:
         # 最大時間超過イベントを待つ（Ctrl+C で KeyboardInterrupt に飛ぶ）
