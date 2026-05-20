@@ -17,5 +17,12 @@ dependencies = [
     "click",
 ]
 
+[project.optional-dependencies]
+dev = [
+    "pytest",
+    "pytest-cov",
+    "httpx",
+]
+
 [project.scripts]
 vmemo = "voice_memo.cli:main"
