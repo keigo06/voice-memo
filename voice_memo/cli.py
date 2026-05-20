@@ -173,9 +173,64 @@ def devices(set_name: str | None) -> None:
 
 
 @main.command()
-def transcribe() -> None:
-    """音声をテキストに変換する（未実装）"""
-    click.echo("未実装")
+@click.argument("memo_id", required=False, default=None)
+def transcribe(memo_id: str | None) -> None:
+    """音声をテキストに変換する"""
+    import json as _json
+
+    from voice_memo.transcribe import transcribe_memo
+
+    config = load_config()
+    meta_dir = Path(config.save_dir).expanduser() / "meta"
+    audio_dir = Path(config.save_dir).expanduser() / "audio"
+
+    if not meta_dir.exists():
+        click.echo("メモがありません。")
+        return
+
+    if memo_id is not None:
+        # 指定 ID のみ処理
+        meta_path = meta_dir / f"{memo_id}.memo.json"
+        if not meta_path.exists():
+            click.echo(f"エラー: メモが見つかりません: {memo_id}", err=True)
+            raise SystemExit(1)
+        with meta_path.open(encoding="utf-8") as f:
+            records = [_json.load(f)]
+    else:
+        # pending 全件を処理
+        records = []
+        for p in meta_dir.glob("*.memo.json"):
+            with p.open(encoding="utf-8") as f:
+                r = _json.load(f)
+            if r.get("transcript_status") == "pending":
+                records.append(r)
+        records.sort(key=lambda r: r.get("unix_timestamp", 0))
+
+    if not records:
+        click.echo("処理対象のメモがありません。")
+        return
+
+    count = 0
+    for r in records:
+        rid = r["id"]
+        duration = r.get("duration_sec", 0)
+        meta_path = meta_dir / f"{rid}.memo.json"
+        wav_path = audio_dir / f"{rid}.wav"
+
+        if not wav_path.exists():
+            # recorder が .wav で保存している場合と .memo.wav の両方を試す
+            wav_path = audio_dir / f"{rid}.memo.wav"
+
+        click.echo(f"処理中: {rid} ({duration:.1f}秒)...")
+
+        try:
+            text = transcribe_memo(rid, wav_path, meta_path, config)
+            click.echo(f"完了: 「{text.strip()}」")
+            count += 1
+        except Exception as e:
+            click.echo(f"失敗: {rid} ({e})", err=True)
+
+    click.echo(f"完了: {count}件処理しました")
 
 
 @main.command()
@@ -201,8 +256,11 @@ def setup() -> None:
         else:
             click.echo("  警告: リポジトリの config.yaml が見つかりません。スキップします。", err=True)
 
-    # faster-whisper モデルのダウンロードは Phase 5 で実装
-    click.echo("  モデルのダウンロード: Phase 5 で実装されます")
+    from voice_memo.transcribe import download_model
+    config = load_config()
+    click.echo(f"  Whisperモデル ({config.whisper_model}) をダウンロード中...")
+    download_model(config.whisper_model, config.whisper_device)
+    click.echo("  ダウンロード完了")
 
     click.echo("セットアップが完了しました。")
     click.echo("  次のステップ: vmemo record で録音を開始できます")
