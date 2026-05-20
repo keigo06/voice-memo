@@ -7,7 +7,7 @@ from typing import Optional
 
 import uvicorn
 from fastapi import FastAPI, HTTPException, Query
-from fastapi.responses import HTMLResponse, JSONResponse
+from fastapi.responses import FileResponse, HTMLResponse
 from filelock import FileLock
 from pydantic import BaseModel
 
@@ -137,3 +137,104 @@ def delete_memo(memo_id: str):
     wav_path.unlink(missing_ok=True)
 
     return {"status": "deleted", "id": memo_id}
+
+
+# ---------------------------------------------------------------------------
+# Audio streaming
+# ---------------------------------------------------------------------------
+
+@app.get("/audio/{memo_id}")
+def get_audio(memo_id: str):
+    wav_path = _audio_dir() / f"{memo_id}.memo.wav"
+    if not wav_path.exists():
+        raise HTTPException(status_code=404, detail="audio not found")
+    return FileResponse(
+        path=wav_path,
+        media_type="audio/wav",
+        headers={"Accept-Ranges": "bytes"},
+    )
+
+
+# ---------------------------------------------------------------------------
+# Transcribe job (stub – Phase 5 will replace _run_transcribe)
+# ---------------------------------------------------------------------------
+
+def _run_transcribe(memo_id: str) -> None:
+    """Phase 5 で実際のWhisper処理に置き換える。現時点は failed を記録するだけ。"""
+    path = _meta_dir() / f"{memo_id}.memo.json"
+    if not path.exists():
+        return
+    data = _read_meta(path)
+    data["transcript_status"] = "failed"
+    data["transcript"] = "Phase 5 で実装予定"
+    _write_meta(path, data)
+
+
+def _transcribe_job(memo_id: str) -> None:
+    """バックグラウンドスレッドで実行されるジョブ。processing → done/failed に更新する。"""
+    path = _meta_dir() / f"{memo_id}.memo.json"
+    if not path.exists():
+        return
+
+    data = _read_meta(path)
+    data["transcript_status"] = "processing"
+    _write_meta(path, data)
+
+    try:
+        _run_transcribe(memo_id)
+    except Exception:
+        data = _read_meta(path)
+        data["transcript_status"] = "failed"
+        data["transcript"] = "Phase 5 で実装予定"
+        _write_meta(path, data)
+
+
+@app.post("/api/transcribe/{memo_id}")
+def start_transcribe(memo_id: str):
+    path = _meta_dir() / f"{memo_id}.memo.json"
+    if not path.exists():
+        raise HTTPException(status_code=404, detail="memo not found")
+    _executor.submit(_transcribe_job, memo_id)
+    return {"status": "queued"}
+
+
+# ---------------------------------------------------------------------------
+# Port check and server entry point
+# ---------------------------------------------------------------------------
+
+def _is_port_in_use(port: int) -> bool:
+    with socket.socket(socket.AF_INET, socket.SOCK_STREAM) as s:
+        return s.connect_ex(("localhost", port)) == 0
+
+
+def run_server(config: Config) -> None:
+    global _config
+    _config = config
+
+    # processing 状態のメモをpendingにリセット（クラッシュ時のリカバリ）
+    meta = Path(config.save_dir).expanduser() / "meta"
+    if meta.exists():
+        for p in meta.glob("*.memo.json"):
+            try:
+                data = _read_meta(p)
+                if data.get("transcript_status") == "processing":
+                    data["transcript_status"] = "pending"
+                    _write_meta(p, data)
+            except Exception:
+                pass
+
+    if _is_port_in_use(config.server_port):
+        print(f"エラー: ポート {config.server_port} は既に使用中です。")
+        print("config.yaml の server_port を変更するか、既存のプロセスを停止してください。")
+        return
+
+    url = f"http://localhost:{config.server_port}"
+    print(f"Web UI起動: {url}")
+    print("Ctrl+Cで停止")
+
+    if config.open_browser:
+        # uvicorn が listen を開始してからブラウザを開くため、別スレッドで遅延起動
+        import threading
+        threading.Timer(1.0, webbrowser.open, args=(url,)).start()
+
+    uvicorn.run(app, host="0.0.0.0", port=config.server_port, log_level="warning")
