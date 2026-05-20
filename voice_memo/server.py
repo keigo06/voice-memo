@@ -238,3 +238,349 @@ def run_server(config: Config) -> None:
         threading.Timer(1.0, webbrowser.open, args=(url,)).start()
 
     uvicorn.run(app, host="0.0.0.0", port=config.server_port, log_level="warning")
+
+
+# ---------------------------------------------------------------------------
+# HTML frontend (inlined – no external CDN)
+# ---------------------------------------------------------------------------
+
+_HTML = """<!DOCTYPE html>
+<html lang="ja">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>voice-memo</title>
+<style>
+  *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+  body { font-family: system-ui, sans-serif; font-size: 14px; background: #f5f5f5; color: #222; }
+  header { background: #2c3e50; color: #fff; padding: 12px 20px; display: flex; align-items: center; gap: 16px; }
+  header h1 { font-size: 18px; font-weight: 600; }
+  .toolbar { background: #fff; border-bottom: 1px solid #ddd; padding: 10px 20px; display: flex; gap: 10px; flex-wrap: wrap; align-items: center; }
+  .toolbar input, .toolbar select { padding: 6px 10px; border: 1px solid #ccc; border-radius: 4px; font-size: 13px; }
+  .toolbar input[type=text] { width: 220px; }
+  .toolbar button { padding: 6px 14px; border: none; border-radius: 4px; background: #2c3e50; color: #fff; cursor: pointer; font-size: 13px; }
+  .toolbar button:hover { background: #34495e; }
+  #memo-count { font-size: 12px; color: #666; margin-left: auto; }
+  table { width: 100%; border-collapse: collapse; background: #fff; }
+  thead th { background: #ecf0f1; padding: 8px 12px; text-align: left; font-size: 13px; border-bottom: 2px solid #ddd; position: sticky; top: 0; }
+  tbody tr { border-bottom: 1px solid #eee; cursor: pointer; }
+  tbody tr:hover { background: #f0f7ff; }
+  tbody tr.selected { background: #e8f4fd; }
+  td { padding: 8px 12px; vertical-align: top; }
+  .status-pending { color: #e67e22; }
+  .status-processing { color: #2980b9; }
+  .status-done { color: #27ae60; }
+  .status-failed { color: #c0392b; }
+  .tag { display: inline-block; background: #ecf0f1; border-radius: 3px; padding: 1px 6px; font-size: 11px; margin: 1px; }
+  #detail-panel { background: #fff; border-top: 2px solid #2c3e50; padding: 20px; display: none; }
+  #detail-panel.open { display: block; }
+  .detail-section { margin-bottom: 16px; }
+  .detail-section label { display: block; font-size: 12px; color: #666; margin-bottom: 4px; font-weight: 600; text-transform: uppercase; letter-spacing: 0.5px; }
+  #title-input { width: 100%; padding: 6px 8px; border: 1px solid #ccc; border-radius: 4px; font-size: 15px; }
+  #title-input:focus { outline: none; border-color: #2980b9; }
+  .tags-container { display: flex; flex-wrap: wrap; gap: 4px; align-items: center; border: 1px solid #ccc; border-radius: 4px; padding: 4px 6px; min-height: 34px; cursor: text; }
+  .tag-item { display: inline-flex; align-items: center; background: #d6eaf8; border-radius: 3px; padding: 2px 6px; font-size: 12px; }
+  .tag-item .remove-tag { cursor: pointer; margin-left: 4px; color: #888; font-size: 14px; line-height: 1; }
+  .tag-item .remove-tag:hover { color: #c0392b; }
+  #tag-input { border: none; outline: none; font-size: 13px; min-width: 80px; flex: 1; }
+  #transcript-box { background: #f9f9f9; border: 1px solid #ddd; border-radius: 4px; padding: 10px; min-height: 60px; font-size: 13px; line-height: 1.6; white-space: pre-wrap; word-break: break-word; }
+  .btn { padding: 7px 16px; border: none; border-radius: 4px; cursor: pointer; font-size: 13px; }
+  .btn-primary { background: #2980b9; color: #fff; }
+  .btn-primary:hover { background: #2471a3; }
+  .btn-danger { background: #e74c3c; color: #fff; }
+  .btn-danger:hover { background: #c0392b; }
+  .btn:disabled { opacity: 0.5; cursor: default; }
+  .action-row { display: flex; gap: 10px; align-items: center; flex-wrap: wrap; }
+  audio { width: 100%; margin-top: 4px; }
+  .table-wrapper { overflow-x: auto; }
+  #no-memos { padding: 40px; text-align: center; color: #999; display: none; }
+</style>
+</head>
+<body>
+<header>
+  <h1>voice-memo</h1>
+</header>
+
+<div class="toolbar">
+  <input type="text" id="search-input" placeholder="タイトル・タグ・文字起こしで検索...">
+  <input type="text" id="date-input" placeholder="YYYY-MM-DD">
+  <input type="text" id="tag-filter-input" placeholder="タグで絞り込み">
+  <button onclick="loadMemos()">再読み込み</button>
+  <span id="memo-count"></span>
+</div>
+
+<div class="table-wrapper">
+  <table id="memo-table">
+    <thead>
+      <tr>
+        <th>日時</th>
+        <th>長さ</th>
+        <th>状態</th>
+        <th>タイトル</th>
+        <th>タグ</th>
+      </tr>
+    </thead>
+    <tbody id="memo-tbody"></tbody>
+  </table>
+  <div id="no-memos">メモがありません</div>
+</div>
+
+<div id="detail-panel">
+  <div class="detail-section">
+    <label>タイトル</label>
+    <input type="text" id="title-input" placeholder="タイトルを入力...">
+  </div>
+  <div class="detail-section">
+    <label>タグ</label>
+    <div class="tags-container" id="tags-container" onclick="document.getElementById('tag-input').focus()">
+      <input type="text" id="tag-input" placeholder="タグを追加してEnter">
+    </div>
+  </div>
+  <div class="detail-section">
+    <label>音声</label>
+    <audio id="audio-player" controls></audio>
+  </div>
+  <div class="detail-section">
+    <label>文字起こし</label>
+    <div id="transcript-box">-</div>
+  </div>
+  <div class="action-row">
+    <button class="btn btn-primary" id="transcribe-btn" onclick="startTranscribe()">文字起こし開始</button>
+    <span id="transcribe-status" style="font-size:12px;color:#666;"></span>
+    <button class="btn btn-danger" style="margin-left:auto;" onclick="deleteMemo()">削除</button>
+  </div>
+</div>
+
+<script>
+let _currentId = null;
+let _pollTimer = null;
+let _memos = [];
+
+// -----------------------------------------------------------------------
+// Utilities
+// -----------------------------------------------------------------------
+function fmt(dt) {
+  try {
+    const d = new Date(dt);
+    const pad = n => String(n).padStart(2, '0');
+    return d.getFullYear() + '-' + pad(d.getMonth()+1) + '-' + pad(d.getDate())
+         + ' ' + pad(d.getHours()) + ':' + pad(d.getMinutes());
+  } catch { return dt || ''; }
+}
+
+function statusClass(s) {
+  return { pending:'status-pending', processing:'status-processing', done:'status-done', failed:'status-failed' }[s] || '';
+}
+
+// -----------------------------------------------------------------------
+// Load memo list
+// -----------------------------------------------------------------------
+async function loadMemos() {
+  const q    = document.getElementById('search-input').value.trim();
+  const date = document.getElementById('date-input').value.trim();
+  const tag  = document.getElementById('tag-filter-input').value.trim();
+
+  const params = new URLSearchParams();
+  if (q)    params.set('q', q);
+  if (date) params.set('date', date);
+  if (tag)  params.set('tag', tag);
+
+  const res = await fetch('/api/memos?' + params);
+  _memos = await res.json();
+
+  const tbody = document.getElementById('memo-tbody');
+  tbody.innerHTML = '';
+  document.getElementById('memo-count').textContent = `${_memos.length} 件`;
+  document.getElementById('no-memos').style.display = _memos.length ? 'none' : 'block';
+
+  _memos.forEach(m => {
+    const tr = document.createElement('tr');
+    tr.dataset.id = m.id;
+    if (m.id === _currentId) tr.classList.add('selected');
+
+    const tagsHtml = (m.tags || []).map(t => `<span class="tag">${esc(t)}</span>`).join('');
+    tr.innerHTML = `
+      <td>${esc(fmt(m.created_at))}</td>
+      <td>${(m.duration_sec || 0).toFixed(1)}秒</td>
+      <td class="${statusClass(m.transcript_status)}">[${esc(m.transcript_status || '?')}]</td>
+      <td>${esc(m.title || '-')}</td>
+      <td>${tagsHtml}</td>
+    `;
+    tr.addEventListener('click', () => openDetail(m.id));
+    tbody.appendChild(tr);
+  });
+}
+
+function esc(s) {
+  return String(s).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;');
+}
+
+// -----------------------------------------------------------------------
+// Detail panel
+// -----------------------------------------------------------------------
+async function openDetail(id) {
+  _currentId = id;
+
+  // ハイライト更新
+  document.querySelectorAll('#memo-tbody tr').forEach(tr => {
+    tr.classList.toggle('selected', tr.dataset.id === id);
+  });
+
+  const res = await fetch(`/api/memos/${id}`);
+  if (!res.ok) return;
+  const m = await res.json();
+
+  document.getElementById('title-input').value = m.title || '';
+  document.getElementById('audio-player').src = `/audio/${id}`;
+  document.getElementById('transcript-box').textContent = m.transcript || '-';
+  document.getElementById('transcribe-status').textContent = '';
+  renderTags(m.tags || []);
+  updateTranscribeBtn(m.transcript_status);
+
+  document.getElementById('detail-panel').classList.add('open');
+
+  // polling 中なら止める
+  if (_pollTimer) { clearInterval(_pollTimer); _pollTimer = null; }
+  if (m.transcript_status === 'processing') {
+    _startPolling(id);
+  }
+}
+
+function updateTranscribeBtn(status) {
+  const btn = document.getElementById('transcribe-btn');
+  btn.disabled = (status === 'processing');
+  btn.textContent = status === 'processing' ? '処理中...' : '文字起こし開始';
+}
+
+// -----------------------------------------------------------------------
+// Tags
+// -----------------------------------------------------------------------
+let _tags = [];
+
+function renderTags(tags) {
+  _tags = [...tags];
+  const container = document.getElementById('tags-container');
+  // タグ入力欄以外をクリア
+  Array.from(container.children).forEach(c => { if (c.id !== 'tag-input') c.remove(); });
+
+  _tags.forEach((t, i) => {
+    const span = document.createElement('span');
+    span.className = 'tag-item';
+    span.innerHTML = `${esc(t)} <span class="remove-tag" data-idx="${i}" title="削除">×</span>`;
+    span.querySelector('.remove-tag').addEventListener('click', e => {
+      e.stopPropagation();
+      removeTag(i);
+    });
+    container.insertBefore(span, document.getElementById('tag-input'));
+  });
+}
+
+function removeTag(idx) {
+  _tags.splice(idx, 1);
+  renderTags(_tags);
+  saveTags();
+}
+
+document.getElementById('tag-input').addEventListener('keydown', e => {
+  if (e.key === 'Enter') {
+    e.preventDefault();
+    const val = e.target.value.trim();
+    if (val && !_tags.includes(val)) {
+      _tags.push(val);
+      renderTags(_tags);
+      saveTags();
+    }
+    e.target.value = '';
+  }
+});
+
+async function saveTags() {
+  if (!_currentId) return;
+  await fetch(`/api/memos/${_currentId}`, {
+    method: 'PUT',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ tags: _tags }),
+  });
+  loadMemos();
+}
+
+// -----------------------------------------------------------------------
+// Title inline edit
+// -----------------------------------------------------------------------
+document.getElementById('title-input').addEventListener('blur', async () => {
+  if (!_currentId) return;
+  const title = document.getElementById('title-input').value;
+  await fetch(`/api/memos/${_currentId}`, {
+    method: 'PUT',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ title }),
+  });
+  loadMemos();
+});
+
+// -----------------------------------------------------------------------
+// Transcribe
+// -----------------------------------------------------------------------
+async function startTranscribe() {
+  if (!_currentId) return;
+  const res = await fetch(`/api/transcribe/${_currentId}`, { method: 'POST' });
+  if (!res.ok) return;
+  document.getElementById('transcribe-status').textContent = 'キューに追加しました';
+  updateTranscribeBtn('processing');
+  _startPolling(_currentId);
+}
+
+function _startPolling(id) {
+  if (_pollTimer) clearInterval(_pollTimer);
+  _pollTimer = setInterval(async () => {
+    const res = await fetch(`/api/memos/${id}`);
+    if (!res.ok) return;
+    const m = await res.json();
+    if (m.id !== _currentId) { clearInterval(_pollTimer); _pollTimer = null; return; }
+
+    document.getElementById('transcript-box').textContent = m.transcript || '-';
+    updateTranscribeBtn(m.transcript_status);
+
+    if (m.transcript_status !== 'processing') {
+      clearInterval(_pollTimer);
+      _pollTimer = null;
+      document.getElementById('transcribe-status').textContent =
+        m.transcript_status === 'done' ? '完了' : '終了 (' + m.transcript_status + ')';
+      loadMemos();
+    }
+  }, 3000);
+}
+
+// -----------------------------------------------------------------------
+// Delete
+// -----------------------------------------------------------------------
+async function deleteMemo() {
+  if (!_currentId) return;
+  if (!confirm(`メモ "${_currentId}" を削除しますか？`)) return;
+  const res = await fetch(`/api/memos/${_currentId}`, { method: 'DELETE' });
+  if (!res.ok) { alert('削除に失敗しました'); return; }
+  _currentId = null;
+  document.getElementById('detail-panel').classList.remove('open');
+  loadMemos();
+}
+
+// -----------------------------------------------------------------------
+// Search on Enter / input
+// -----------------------------------------------------------------------
+['search-input', 'date-input', 'tag-filter-input'].forEach(id => {
+  document.getElementById(id).addEventListener('keydown', e => { if (e.key === 'Enter') loadMemos(); });
+});
+
+// -----------------------------------------------------------------------
+// Init
+// -----------------------------------------------------------------------
+loadMemos();
+</script>
+</body>
+</html>
+"""
+
+
+@app.get("/", response_class=HTMLResponse)
+def index():
+    return HTMLResponse(content=_HTML)
