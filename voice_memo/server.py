@@ -12,6 +12,7 @@ from filelock import FileLock
 from pydantic import BaseModel
 
 from voice_memo.config import Config
+from voice_memo.transcribe import transcribe_memo
 
 app = FastAPI(title="voice-memo")
 
@@ -160,14 +161,12 @@ def get_audio(memo_id: str):
 # ---------------------------------------------------------------------------
 
 def _run_transcribe(memo_id: str) -> None:
-    """Phase 5 で実際のWhisper処理に置き換える。現時点は failed を記録するだけ。"""
-    path = _meta_dir() / f"{memo_id}.memo.json"
-    if not path.exists():
-        return
-    data = _read_meta(path)
-    data["transcript_status"] = "failed"
-    data["transcript"] = "Phase 5 で実装予定"
-    _write_meta(path, data)
+    assert _config is not None
+    meta_path = _meta_dir() / f"{memo_id}.memo.json"
+    wav_path = _audio_dir() / f"{memo_id}.wav"
+    if not wav_path.exists():
+        wav_path = _audio_dir() / f"{memo_id}.memo.wav"
+    transcribe_memo(memo_id, wav_path, meta_path, _config)
 
 
 def _transcribe_job(memo_id: str) -> None:
@@ -176,17 +175,10 @@ def _transcribe_job(memo_id: str) -> None:
     if not path.exists():
         return
 
-    data = _read_meta(path)
-    data["transcript_status"] = "processing"
-    _write_meta(path, data)
-
     try:
         _run_transcribe(memo_id)
     except Exception:
-        data = _read_meta(path)
-        data["transcript_status"] = "failed"
-        data["transcript"] = "Phase 5 で実装予定"
-        _write_meta(path, data)
+        pass
 
 
 @app.post("/api/transcribe/{memo_id}")
