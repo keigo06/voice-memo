@@ -1,0 +1,21 @@
+[build-system]
+requires = ["hatchling"]
+build-backend = "hatchling.build"
+
+[project]
+name = "voice-memo"
+version = "0.1.0"
+requires-python = ">=3.10"
+dependencies = [
+    "sounddevice",
+    "numpy",
+    "fastapi",
+    "uvicorn",
+    "faster-whisper",
+    "filelock",
+    "pyyaml",
+    "click",
+]
+
+[project.scripts]
+vmemo = "voice_memo.cli:main"
