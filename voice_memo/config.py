@@ -1,3 +1,5 @@
+import os
+import sys
 from dataclasses import dataclass
 from pathlib import Path
 
@@ -24,14 +26,26 @@ def _repo_config() -> Path:
     return Path(__file__).parent.parent / "config.yaml"
 
 
+def _user_config() -> Path:
+    """ユーザー設定ファイルのパス（OS によって異なる）
+
+    Windows: %APPDATA%/voice-memo/config.yaml
+    Linux/Mac: ~/voice-memo/config.yaml
+    """
+    if sys.platform == "win32":
+        appdata = os.environ.get("APPDATA", "~")
+        return Path(appdata) / "voice-memo" / "config.yaml"
+    return Path("~/voice-memo/config.yaml").expanduser()
+
+
 def load_config(path: Path | None = None) -> Config:
-    """優先順位: 引数 > ~/voice-memo/config.yaml > リポジトリのconfig.yaml"""
+    """優先順位: 引数 > ユーザー設定（OS依存） > リポジトリのconfig.yaml"""
     candidates = []
 
     if path is not None:
         candidates.append(Path(path))
 
-    candidates.append(Path("~/voice-memo/config.yaml").expanduser())
+    candidates.append(_user_config())
     candidates.append(_repo_config())
 
     raw: dict = {}
