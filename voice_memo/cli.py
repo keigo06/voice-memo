@@ -1,3 +1,4 @@
+import logging
 import signal
 import sys
 import threading
@@ -12,7 +13,10 @@ from voice_memo.recorder import AudioRecorder, RecorderConfig
 
 @click.group()
 def main() -> None:
-    pass
+    logging.basicConfig(
+        level=logging.WARNING,
+        format="%(levelname)s %(name)s: %(message)s",
+    )
 
 
 @main.command()
