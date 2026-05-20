@@ -668,6 +668,8 @@ sudo apt install libportaudio2   # sounddeviceの依存
   → faster-whisper統合
   → CLI + Web UIからの実行
   → 非同期ジョブ方式
+
+テストの実装
 ```
 
 ---
