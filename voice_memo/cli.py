@@ -180,14 +180,102 @@ def transcribe() -> None:
 
 @main.command()
 def setup() -> None:
-    """初期セットアップ（未実装）"""
-    click.echo("未実装")
+    """初期セットアップ"""
+    import shutil
+
+    click.echo("セットアップを開始します...")
+
+    base_dir = Path("~/voice-memo").expanduser()
+    data_dir = base_dir / "data"
+    for sub in ("audio", "meta"):
+        (data_dir / sub).mkdir(parents=True, exist_ok=True)
+    (base_dir / "logs").mkdir(parents=True, exist_ok=True)
+    click.echo(f"  データディレクトリを作成: {data_dir}/")
+
+    config_dest = base_dir / "config.yaml"
+    if not config_dest.exists():
+        repo_config = Path(__file__).parent.parent / "config.yaml"
+        if repo_config.exists():
+            shutil.copy(str(repo_config), str(config_dest))
+            click.echo(f"  設定ファイルをコピー: {config_dest}")
+        else:
+            click.echo("  警告: リポジトリの config.yaml が見つかりません。スキップします。", err=True)
+
+    # faster-whisper モデルのダウンロードは Phase 5 で実装
+    click.echo("  モデルのダウンロード: Phase 5 で実装されます")
+
+    click.echo("セットアップが完了しました。")
+    click.echo("  次のステップ: vmemo record で録音を開始できます")
 
 
 @main.command()
 def install() -> None:
-    """依存パッケージをインストールする（未実装）"""
-    click.echo("未実装")
+    """systemd ユーザーサービスとして登録する"""
+    import shutil
+    import subprocess
+
+    systemctl = shutil.which("systemctl")
+    if systemctl is None:
+        click.echo("エラー: systemctl が見つかりません。Linux (systemd) 環境で実行してください。", err=True)
+        raise SystemExit(1)
+
+    unit_dir = Path("~/.config/systemd/user").expanduser()
+    unit_file = unit_dir / "voice-memo.service"
+
+    if unit_file.exists():
+        if not click.confirm(f"既にインストール済みです ({unit_file})。上書きしますか？"):
+            return
+
+    # vmemo 実行ファイルのパスを解決する
+    vmemo_path = shutil.which("vmemo") or (Path(sys.executable).parent / "vmemo")
+    vmemo_path = str(vmemo_path)
+    bin_dir = str(Path(vmemo_path).parent)
+
+    unit_content = (
+        "[Unit]\n"
+        "Description=VoiceMemo Server\n"
+        "After=network.target\n"
+        "\n"
+        "[Service]\n"
+        f"ExecStart={vmemo_path} server\n"
+        "Restart=on-failure\n"
+        "RestartSec=5\n"
+        f"Environment=PATH={bin_dir}:/usr/local/bin:/usr/bin:/bin\n"
+        "\n"
+        "[Install]\n"
+        "WantedBy=default.target\n"
+    )
+
+    click.echo("systemd ユーザーサービスをインストールします...")
+    click.echo(f"  ユニットファイル: {unit_file}")
+    click.echo(f"  ExecStart: {vmemo_path} server")
+
+    unit_dir.mkdir(parents=True, exist_ok=True)
+    unit_file.write_text(unit_content, encoding="utf-8")
+
+    def _run(cmd: list[str]) -> bool:
+        result = subprocess.run(cmd, capture_output=True, text=True, check=False)
+        if result.returncode != 0:
+            click.echo(f"エラー: {' '.join(cmd)} が失敗しました (code={result.returncode})", err=True)
+            if result.stderr:
+                click.echo(result.stderr.strip(), err=True)
+            return False
+        return True
+
+    if not _run([systemctl, "--user", "daemon-reload"]):
+        raise SystemExit(1)
+    if not _run([systemctl, "--user", "enable", "voice-memo"]):
+        raise SystemExit(1)
+    if not _run([systemctl, "--user", "start", "voice-memo"]):
+        raise SystemExit(1)
+
+    config = load_config()
+    port = config.server_port
+
+    click.echo("インストール完了しました。")
+    click.echo("  自動起動: 有効")
+    click.echo("  現在の状態: 起動中")
+    click.echo(f"  Web UI: http://localhost:{port}")
 
 
 @main.command()
