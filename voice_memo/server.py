@@ -1,4 +1,3 @@
-import json
 import socket
 import webbrowser
 from concurrent.futures import ThreadPoolExecutor
@@ -8,10 +7,10 @@ from typing import Optional
 import uvicorn
 from fastapi import FastAPI, HTTPException, Query
 from fastapi.responses import FileResponse, HTMLResponse
-from filelock import FileLock
 from pydantic import BaseModel
 
 from voice_memo.config import Config
+from voice_memo.storage import read_meta, write_meta
 from voice_memo.transcribe import transcribe_memo
 
 app = FastAPI(title="voice-memo")
@@ -21,18 +20,8 @@ _config: Config | None = None
 
 
 # ---------------------------------------------------------------------------
-# File I/O helpers
+# Directory helpers
 # ---------------------------------------------------------------------------
-
-def _read_meta(path: Path) -> dict:
-    with FileLock(str(path) + ".lock"):
-        return json.loads(path.read_text(encoding="utf-8"))
-
-
-def _write_meta(path: Path, data: dict) -> None:
-    with FileLock(str(path) + ".lock"):
-        path.write_text(json.dumps(data, ensure_ascii=False, indent=2), encoding="utf-8")
-
 
 def _meta_dir() -> Path:
     assert _config is not None
@@ -51,7 +40,7 @@ def _load_all_memos() -> list[dict]:
     records = []
     for p in meta.glob("*.memo.json"):
         try:
-            records.append(_read_meta(p))
+            records.append(read_meta(p))
         except Exception:
             pass
     records.sort(key=lambda r: r.get("unix_timestamp", 0), reverse=True)
@@ -106,7 +95,7 @@ def get_memo(memo_id: str):
     path = _meta_dir() / f"{memo_id}.memo.json"
     if not path.exists():
         raise HTTPException(status_code=404, detail="memo not found")
-    return _read_meta(path)
+    return read_meta(path)
 
 
 @app.put("/api/memos/{memo_id}")
@@ -115,12 +104,12 @@ def update_memo(memo_id: str, body: MemoUpdate):
     if not path.exists():
         raise HTTPException(status_code=404, detail="memo not found")
 
-    data = _read_meta(path)
+    data = read_meta(path)
     if body.title is not None:
         data["title"] = body.title
     if body.tags is not None:
         data["tags"] = body.tags
-    _write_meta(path, data)
+    write_meta(path, data)
     return data
 
 
@@ -208,10 +197,10 @@ def run_server(config: Config) -> None:
     if meta.exists():
         for p in meta.glob("*.memo.json"):
             try:
-                data = _read_meta(p)
+                data = read_meta(p)
                 if data.get("transcript_status") == "processing":
                     data["transcript_status"] = "pending"
-                    _write_meta(p, data)
+                    write_meta(p, data)
             except Exception:
                 pass
 
