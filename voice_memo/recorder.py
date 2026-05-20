@@ -55,3 +55,100 @@ class MemoRecord:
         }
         with path.open("w", encoding="utf-8") as f:
             json.dump(data, f, ensure_ascii=False, indent=2)
+
+
+class AudioRecorder:
+    def __init__(self, config: RecorderConfig) -> None:
+        try:
+            import sounddevice as sd  # noqa: F401
+        except ImportError:
+            raise ImportError(
+                "sounddeviceが見つかりません。\n"
+                "  pip install sounddevice\n"
+                "  sudo apt install libportaudio2"
+            )
+
+        self._config = config
+        self._queue: queue.Queue[np.ndarray] = queue.Queue()
+        self._stream = None
+        self._timer: threading.Timer | None = None
+        self._stop_event = threading.Event()
+        self._start_time: float = 0.0
+
+    def start(self) -> None:
+        """sd.InputStream を開始。コールバックでチャンクをキューに積む。最大時間タイマーをセット。"""
+        import sounddevice as sd
+
+        self._stop_event.clear()
+        device_index = find_device(self._config.device_name)
+        self._start_time = time.time()
+
+        self._stream = sd.InputStream(
+            device=device_index,
+            samplerate=self._config.sample_rate,
+            channels=self._config.channels,
+            dtype="float32",
+            callback=self._callback,
+        )
+        self._stream.start()
+
+        # 最大録音時間の強制停止イベントをセット
+        self._timer = threading.Timer(
+            self._config.max_duration, self._stop_event.set
+        )
+        self._timer.daemon = True
+        self._timer.start()
+
+        logger.info(
+            f"録音開始: device={self._config.device_name}, "
+            f"rate={self._config.sample_rate}, max={self._config.max_duration}s"
+        )
+
+    def stop(self) -> MemoRecord:
+        """InputStream を停止し、キューをフラッシュして MemoRecord を返す"""
+        if self._timer is not None:
+            self._timer.cancel()
+
+        if self._stream is not None:
+            self._stream.stop()
+            self._stream.close()
+            self._stream = None
+
+        elapsed = time.time() - self._start_time
+
+        # キューを全フラッシュ（末尾の欠損を防ぐ）
+        chunks: list[np.ndarray] = []
+        while not self._queue.empty():
+            try:
+                chunks.append(self._queue.get_nowait())
+            except queue.Empty:
+                break
+
+        if chunks:
+            audio_data = np.concatenate(chunks, axis=0).flatten()
+        else:
+            audio_data = np.zeros(0, dtype=np.float32)
+
+        ts = self._start_time
+        created_at = datetime.fromtimestamp(ts, tz=timezone.utc).astimezone()
+        memo_id = created_at.strftime("%Y%m%d_%H%M%S")
+
+        logger.info(f"録音停止: id={memo_id}, duration={elapsed:.1f}s, samples={len(audio_data)}")
+
+        return MemoRecord(
+            id=memo_id,
+            unix_timestamp=ts,
+            audio_data=audio_data,
+            sample_rate=self._config.sample_rate,
+            created_at=created_at,
+        )
+
+    @property
+    def stop_event(self) -> threading.Event:
+        """最大時間超過を外部から検知するためのイベント"""
+        return self._stop_event
+
+    def _callback(self, indata: np.ndarray, frames: int, time_info, status) -> None:
+        if status:
+            logger.warning(f"録音ステータス異常: {status}")
+        self._queue.put(indata.copy())
