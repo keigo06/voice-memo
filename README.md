@@ -36,6 +36,20 @@ source .venv/bin/activate
 vmemo --help
 ```
 
+## Windows でのインストール
+
+```bash
+git clone https://github.com/keigo06/voice-memo.git
+cd voice-memo
+uv sync
+```
+
+Windows では PortAudio は sounddevice の wheel に同梱されているため、別途インストールは不要です。
+
+設定ファイルは `%APPDATA%\voice-memo\config.yaml` に配置します。
+
+> **Note**: `vmemo install`（systemd 自動起動）は Linux 専用です。Windows での自動起動はタスクスケジューラを使用してください。
+
 ## 使い方
 
 ### 録音
