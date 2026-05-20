@@ -274,6 +274,13 @@ def install() -> None:
     import shutil
     import subprocess
 
+    if sys.platform == "win32":
+        click.echo("Windows では systemd は使用できません。")
+        click.echo("Windows での自動起動はタスクスケジューラを使用してください。")
+        click.echo("  タスク名: VoiceMemo")
+        click.echo(f"  実行コマンド: vmemo server")
+        return
+
     systemctl = shutil.which("systemctl")
     if systemctl is None:
         click.echo("エラー: systemctl が見つかりません。Linux (systemd) 環境で実行してください。", err=True)
