@@ -134,7 +134,42 @@ def list_cmd(show_all: bool, date_str: str | None, tag: str | None) -> None:
 @click.option("--set", "set_name", default=None, metavar="NAME", help="デバイスをconfig.yamlに書き込む")
 def devices(set_name: str | None) -> None:
     """利用可能なマイク一覧を表示する"""
-    pass
+    import sounddevice as sd
+    import yaml
+
+    config = load_config()
+
+    if set_name is not None:
+        config_path = Path("~/voice-memo/config.yaml").expanduser()
+        if config_path.exists():
+            with config_path.open(encoding="utf-8") as f:
+                raw = yaml.safe_load(f) or {}
+        else:
+            config_path.parent.mkdir(parents=True, exist_ok=True)
+            raw = {}
+
+        raw["device_name"] = set_name
+        with config_path.open("w", encoding="utf-8") as f:
+            yaml.dump(raw, f, allow_unicode=True)
+
+        click.echo(f"デバイスを設定しました: {set_name}")
+        return
+
+    all_devices = sd.query_devices()
+    for i, dev in enumerate(all_devices):
+        if dev["max_input_channels"] < 1:
+            continue
+
+        channels = dev["max_input_channels"]
+        rate = int(dev["default_samplerate"])
+        name = dev["name"]
+
+        # 現在の設定と部分一致する場合に印を付ける
+        marker = ""
+        if config.device_name and config.device_name.lower() in name.lower():
+            marker = "  <- 現在選択中"
+
+        click.echo(f"[{i}] {name}  ({channels}ch, {rate}Hz){marker}")
 
 
 @main.command()
