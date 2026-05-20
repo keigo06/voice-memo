@@ -192,5 +192,7 @@ def install() -> None:
 
 @main.command()
 def server() -> None:
-    """Web UIサーバーを起動する（未実装）"""
-    click.echo("未実装")
+    """Web UIサーバーを起動する"""
+    from voice_memo.server import run_server
+    config = load_config()
+    run_server(config)
