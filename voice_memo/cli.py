@@ -186,8 +186,72 @@ def setup() -> None:
 
 @main.command()
 def install() -> None:
-    """依存パッケージをインストールする（未実装）"""
-    click.echo("未実装")
+    """systemd ユーザーサービスとして登録する"""
+    import shutil
+    import subprocess
+
+    systemctl = shutil.which("systemctl")
+    if systemctl is None:
+        click.echo("エラー: systemctl が見つかりません。Linux (systemd) 環境で実行してください。", err=True)
+        raise SystemExit(1)
+
+    unit_dir = Path("~/.config/systemd/user").expanduser()
+    unit_file = unit_dir / "voice-memo.service"
+
+    if unit_file.exists():
+        if not click.confirm(f"既にインストール済みです ({unit_file})。上書きしますか？"):
+            return
+
+    # vmemo 実行ファイルのパスを解決する
+    vmemo_path = shutil.which("vmemo") or (Path(sys.executable).parent / "vmemo")
+    vmemo_path = str(vmemo_path)
+    bin_dir = str(Path(vmemo_path).parent)
+
+    unit_content = (
+        "[Unit]\n"
+        "Description=VoiceMemo Server\n"
+        "After=network.target\n"
+        "\n"
+        "[Service]\n"
+        f"ExecStart={vmemo_path} server\n"
+        "Restart=on-failure\n"
+        "RestartSec=5\n"
+        f"Environment=PATH={bin_dir}:/usr/local/bin:/usr/bin:/bin\n"
+        "\n"
+        "[Install]\n"
+        "WantedBy=default.target\n"
+    )
+
+    click.echo("systemd ユーザーサービスをインストールします...")
+    click.echo(f"  ユニットファイル: {unit_file}")
+    click.echo(f"  ExecStart: {vmemo_path} server")
+
+    unit_dir.mkdir(parents=True, exist_ok=True)
+    unit_file.write_text(unit_content, encoding="utf-8")
+
+    def _run(cmd: list[str]) -> bool:
+        result = subprocess.run(cmd, capture_output=True, text=True, check=False)
+        if result.returncode != 0:
+            click.echo(f"エラー: {' '.join(cmd)} が失敗しました (code={result.returncode})", err=True)
+            if result.stderr:
+                click.echo(result.stderr.strip(), err=True)
+            return False
+        return True
+
+    if not _run([systemctl, "--user", "daemon-reload"]):
+        raise SystemExit(1)
+    if not _run([systemctl, "--user", "enable", "voice-memo"]):
+        raise SystemExit(1)
+    if not _run([systemctl, "--user", "start", "voice-memo"]):
+        raise SystemExit(1)
+
+    config = load_config()
+    port = config.server_port
+
+    click.echo("インストール完了しました。")
+    click.echo("  自動起動: 有効")
+    click.echo("  現在の状態: 起動中")
+    click.echo(f"  Web UI: http://localhost:{port}")
 
 
 @main.command()
