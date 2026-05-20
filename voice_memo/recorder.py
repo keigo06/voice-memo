@@ -57,6 +57,26 @@ class MemoRecord:
             json.dump(data, f, ensure_ascii=False, indent=2)
 
 
+def find_device(name: str | None) -> int | None:
+    """名前の部分一致でデバイスを検索。見つからない場合は None (デフォルト) を返す"""
+    try:
+        import sounddevice as sd
+    except ImportError:
+        return None
+
+    if name is None:
+        return None
+
+    devices = sd.query_devices()
+    for i, dev in enumerate(devices):
+        if name.lower() in dev["name"].lower():
+            if dev["max_input_channels"] > 0:
+                return i
+
+    logger.warning(f"デバイス '{name}' が見つかりません。デフォルトを使用します。")
+    return None
+
+
 class AudioRecorder:
     def __init__(self, config: RecorderConfig) -> None:
         try:
