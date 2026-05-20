@@ -1,3 +1,4 @@
+import signal
 import sys
 import threading
 import time
@@ -44,6 +45,9 @@ def record() -> None:
 
     ticker = threading.Thread(target=_print_elapsed, daemon=True)
     ticker.start()
+
+    # SIGTERM でも stop_event を立てて finally に落とす
+    signal.signal(signal.SIGTERM, lambda *_: recorder.stop_event.set())
 
     try:
         # 最大時間超過イベントを待つ（Ctrl+C で KeyboardInterrupt に飛ぶ）
