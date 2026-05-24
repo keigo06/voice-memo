@@ -28,13 +28,14 @@ class MemoRecord:
     audio_data: np.ndarray
     sample_rate: int
     created_at: datetime
+    channels: int = 1
 
     def save_wav(self, path: Path) -> None:
         """PCM 16bit WAV として保存"""
         path.parent.mkdir(parents=True, exist_ok=True)
         pcm = (self.audio_data * 32767).clip(-32768, 32767).astype(np.int16)
         with wave.open(str(path), "wb") as wf:
-            wf.setnchannels(1)
+            wf.setnchannels(self.channels)
             wf.setsampwidth(2)  # 16bit = 2 bytes
             wf.setframerate(self.sample_rate)
             wf.writeframes(pcm.tobytes())
@@ -161,6 +162,7 @@ class AudioRecorder:
             audio_data=audio_data,
             sample_rate=self._config.sample_rate,
             created_at=created_at,
+            channels=self._config.channels,
         )
 
     @property
