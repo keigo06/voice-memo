@@ -110,7 +110,14 @@ vmemo install
 
 ## 設定
 
-`~/voice-memo/config.yaml` を作成すると設定を上書きできます。
+OS ごとの設定ファイルパス:
+
+| OS | パス |
+| --- | --- |
+| Linux / macOS | `~/voice-memo/config.yaml` |
+| Windows | `%APPDATA%\voice-memo\config.yaml` |
+
+設定ファイルが存在しない場合はデフォルト値が使用されます。
 
 ```yaml
 device_name: null          # null = デフォルトマイク / 文字列 = 名前で部分一致検索
