@@ -69,7 +69,7 @@ class TestListMemos:
 class TestGetMemo:
     def test_get_api_memos_id_returns_404_for_nonexistent_id(self, client):
         """GET /api/memos/{id} は存在しない ID に 404 を返す"""
-        response = client.get("/api/memos/nonexistent_id")
+        response = client.get("/api/memos/20240101_999999")
         assert response.status_code == 404
 
     def test_get_api_memos_id_returns_memo_for_existing_id(self, client, tmp_path):
@@ -100,7 +100,7 @@ class TestUpdateMemo:
     def test_put_api_memos_id_returns_404_for_nonexistent_id(self, client):
         """PUT /api/memos/{id} は存在しない ID に 404 を返す"""
         response = client.put(
-            "/api/memos/nonexistent_id",
+            "/api/memos/20240101_999999",
             json={"title": "test"},
         )
         assert response.status_code == 404
@@ -131,14 +131,14 @@ class TestDeleteMemo:
 
     def test_delete_api_memos_id_returns_404_for_nonexistent_id(self, client):
         """DELETE /api/memos/{id} は存在しない ID に 404 を返す"""
-        response = client.delete("/api/memos/nonexistent_id")
+        response = client.delete("/api/memos/20240101_999999")
         assert response.status_code == 404
 
 
 class TestStartTranscribe:
     def test_post_api_transcribe_id_returns_404_for_nonexistent_id(self, client):
         """POST /api/transcribe/{id} は存在しない ID に 404 を返す"""
-        response = client.post("/api/transcribe/nonexistent_id")
+        response = client.post("/api/transcribe/20240101_999999")
         assert response.status_code == 404
 
     def test_post_api_transcribe_id_returns_queued_for_existing_id(self, client, tmp_path):
