@@ -100,6 +100,11 @@ class AudioRecorder:
         """sd.InputStream を開始。コールバックでチャンクをキューに積む。最大時間タイマーをセット。"""
         import sounddevice as sd
 
+        if self._config.channels != 1:
+            raise ValueError(
+                f"Only mono (channels=1) is supported, got channels={self._config.channels}"
+            )
+
         self._stop_event.clear()
         device_index = find_device(self._config.device_name)
         self._start_time = time.time()
