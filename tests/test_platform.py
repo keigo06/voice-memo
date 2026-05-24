@@ -3,7 +3,7 @@
 import importlib
 import signal
 from pathlib import Path
-from unittest.mock import patch
+from unittest.mock import MagicMock, patch
 
 import pytest
 
@@ -11,38 +11,31 @@ import pytest
 class TestSigtermGuard:
     """Windows 環境では SIGTERM ハンドラが登録されないことを確認する"""
 
-    def test_sigterm_registered_on_linux(self, monkeypatch):
-        """Linux/Mac では SIGTERM ハンドラが登録される"""
-        registered = []
+    def test_record_does_not_register_sigterm_on_windows(self):
+        """Windows では signal.signal(SIGTERM, ...) が呼ばれないこと"""
+        from click.testing import CliRunner
 
-        def fake_signal(signum, handler):
-            registered.append(signum)
+        with patch("sys.platform", "win32"), \
+             patch("voice_memo.cli.AudioRecorder") as mock_recorder, \
+             patch("signal.signal") as mock_signal:
+            # stop_event をすぐに set してすぐ終了させる
+            instance = mock_recorder.return_value
+            instance.stop_event = MagicMock()
+            instance.stop_event.wait = MagicMock(side_effect=KeyboardInterrupt)
+            instance.stop.return_value = MagicMock(
+                id="20260520_143005",
+                audio_data=MagicMock(__len__=lambda s: 160),
+                sample_rate=16000,
+            )
+            instance.stop.return_value.save_wav = MagicMock()
+            instance.stop.return_value.save_json = MagicMock()
 
-        monkeypatch.setattr(signal, "signal", fake_signal)
+            runner = CliRunner()
+            runner.invoke(__import__("voice_memo.cli", fromlist=["main"]).main, ["record"])
 
-        with patch("sys.platform", "linux"):
-            # SIGTERM ガード付きのコードをインラインで再現する
-            import sys as _sys
-            if _sys.platform != "win32":
-                signal.signal(signal.SIGTERM, lambda *_: None)
-
-        assert signal.SIGTERM in registered
-
-    def test_sigterm_not_registered_on_windows(self, monkeypatch):
-        """Windows では SIGTERM ハンドラが登録されない"""
-        registered = []
-
-        def fake_signal(signum, handler):
-            registered.append(signum)
-
-        monkeypatch.setattr(signal, "signal", fake_signal)
-
-        with patch("sys.platform", "win32"):
-            import sys as _sys
-            if _sys.platform != "win32":
-                signal.signal(signal.SIGTERM, lambda *_: None)
-
-        assert signal.SIGTERM not in registered
+            # SIGTERM が登録されていないことを確認
+            sigterm_calls = [c for c in mock_signal.call_args_list if c[0][0] == signal.SIGTERM]
+            assert len(sigterm_calls) == 0
 
 
 class TestUserConfigPath:
