@@ -148,12 +148,32 @@ class TestStartTranscribe:
         meta_dir = tmp_path / "meta"
         _make_meta_file(meta_dir, "20240101_120000")
 
-        # バックグラウンド実行をモックして実際の文字起こしが走らないようにする
         with patch.object(server_module._executor, "submit"):
             response = client.post("/api/transcribe/20240101_120000")
 
         assert response.status_code == 200
         assert response.json() == {"status": "queued"}
+
+    def test_post_api_transcribe_id_returns_409_when_already_processing(self, client, tmp_path):
+        """POST /api/transcribe/{id} は processing 中の ID に 409 を返す"""
+        meta_dir = tmp_path / "meta"
+        _make_meta_file(meta_dir, "20240101_120000", transcript_status="processing")
+
+        response = client.post("/api/transcribe/20240101_120000")
+        assert response.status_code == 409
+
+    def test_post_api_transcribe_id_sets_status_to_processing_before_queuing(self, client, tmp_path):
+        """POST /api/transcribe/{id} はジョブ投入前にステータスを processing に更新する"""
+        import json
+        meta_dir = tmp_path / "meta"
+        path = _make_meta_file(meta_dir, "20240101_120000")
+
+        with patch.object(server_module._executor, "submit"):
+            client.post("/api/transcribe/20240101_120000")
+
+        with path.open(encoding="utf-8") as f:
+            data = json.load(f)
+        assert data["transcript_status"] == "processing"
 
 
 def _make_wav(path: Path) -> None:

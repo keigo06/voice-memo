@@ -1,9 +1,12 @@
+import logging
 import re
 import socket
 import webbrowser
 from concurrent.futures import ThreadPoolExecutor
 from pathlib import Path
 from typing import Optional
+
+logger = logging.getLogger(__name__)
 
 import uvicorn
 from fastapi import FastAPI, HTTPException, Query
@@ -50,7 +53,7 @@ def _load_all_memos() -> list[dict]:
         try:
             records.append(read_meta(p))
         except Exception:
-            pass
+            logger.warning("メタデータの読み込みに失敗しました: %s", p.name, exc_info=True)
     records.sort(key=lambda r: r.get("unix_timestamp", 0), reverse=True)
     return records
 
@@ -73,7 +76,7 @@ def list_memos(
     q: Optional[str] = Query(default=None),
     tag: Optional[str] = Query(default=None),
     date: Optional[str] = Query(default=None),
-    limit: Optional[int] = Query(default=None),
+    limit: Optional[int] = Query(default=None, ge=0),
 ):
     records = _load_all_memos()
 
@@ -192,6 +195,14 @@ def start_transcribe(memo_id: str):
     path = _meta_dir() / f"{memo_id}.memo.json"
     if not path.exists():
         raise HTTPException(status_code=404, detail="memo not found")
+
+    data = read_meta(path)
+    if data.get("transcript_status") == "processing":
+        raise HTTPException(status_code=409, detail="already processing")
+
+    data["transcript_status"] = "processing"
+    write_meta(path, data)
+
     _executor.submit(_transcribe_job, memo_id)
     return {"status": "queued"}
 
