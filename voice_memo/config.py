@@ -26,15 +26,17 @@ def _repo_config() -> Path:
     return Path(__file__).parent.parent / "config.yaml"
 
 
-def _user_config() -> Path:
+def user_config() -> Path:
     """ユーザー設定ファイルのパス（OS によって異なる）
 
     Windows: %APPDATA%/voice-memo/config.yaml
     Linux/Mac: ~/voice-memo/config.yaml
     """
     if sys.platform == "win32":
-        appdata = os.environ.get("APPDATA", "~")
-        return Path(appdata) / "voice-memo" / "config.yaml"
+        appdata = os.environ.get("APPDATA")
+        if appdata:
+            return Path(appdata) / "voice-memo" / "config.yaml"
+        return Path.home() / "voice-memo" / "config.yaml"
     return Path("~/voice-memo/config.yaml").expanduser()
 
 
@@ -45,7 +47,7 @@ def load_config(path: Path | None = None) -> Config:
     if path is not None:
         candidates.append(Path(path))
 
-    candidates.append(_user_config())
+    candidates.append(user_config())
     candidates.append(_repo_config())
 
     raw: dict = {}

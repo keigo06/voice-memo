@@ -2,6 +2,7 @@
 
 import importlib
 import signal
+from pathlib import Path
 from unittest.mock import patch
 
 import pytest
@@ -54,7 +55,7 @@ class TestUserConfigPath:
         with patch("sys.platform", "linux"):
             from voice_memo import config as cfg
             importlib.reload(cfg)
-            path = cfg._user_config()
+            path = cfg.user_config()
 
         assert "voice-memo" in str(path)
         assert "config.yaml" in str(path)
@@ -67,7 +68,7 @@ class TestUserConfigPath:
         with patch("sys.platform", "win32"):
             from voice_memo import config as cfg
             importlib.reload(cfg)
-            path = cfg._user_config()
+            path = cfg.user_config()
 
         assert "voice-memo" in str(path)
         assert str(tmp_path) in str(path)
@@ -79,11 +80,12 @@ class TestUserConfigPath:
         with patch("sys.platform", "win32"):
             from voice_memo import config as cfg
             importlib.reload(cfg)
-            path = cfg._user_config()
+            path = cfg.user_config()
 
-        # APPDATA が無いときは "~" をそのまま使うため voice-memo が含まれる
+        # APPDATA が無いときは Path.home() を使うため voice-memo が含まれる
         assert "voice-memo" in str(path)
         assert "config.yaml" in str(path)
+        assert str(Path.home()) in str(path)
 
 
 class TestInstallWindowsMessage:
