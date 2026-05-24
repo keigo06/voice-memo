@@ -1,3 +1,4 @@
+import re
 import socket
 import webbrowser
 from concurrent.futures import ThreadPoolExecutor
@@ -17,6 +18,13 @@ app = FastAPI(title="voice-memo")
 
 _executor = ThreadPoolExecutor(max_workers=2)
 _config: Config | None = None
+
+_MEMO_ID_RE = re.compile(r'^\d{8}_\d{6}$')
+
+
+def _validate_memo_id(memo_id: str) -> None:
+    if not _MEMO_ID_RE.match(memo_id):
+        raise HTTPException(status_code=400, detail="invalid memo_id format")
 
 
 # ---------------------------------------------------------------------------
@@ -92,6 +100,7 @@ def list_memos(
 
 @app.get("/api/memos/{memo_id}")
 def get_memo(memo_id: str):
+    _validate_memo_id(memo_id)
     path = _meta_dir() / f"{memo_id}.memo.json"
     if not path.exists():
         raise HTTPException(status_code=404, detail="memo not found")
@@ -100,6 +109,7 @@ def get_memo(memo_id: str):
 
 @app.put("/api/memos/{memo_id}")
 def update_memo(memo_id: str, body: MemoUpdate):
+    _validate_memo_id(memo_id)
     path = _meta_dir() / f"{memo_id}.memo.json"
     if not path.exists():
         raise HTTPException(status_code=404, detail="memo not found")
@@ -115,8 +125,10 @@ def update_memo(memo_id: str, body: MemoUpdate):
 
 @app.delete("/api/memos/{memo_id}")
 def delete_memo(memo_id: str):
+    _validate_memo_id(memo_id)
     meta_path = _meta_dir() / f"{memo_id}.memo.json"
     wav_path = _audio_dir() / f"{memo_id}.memo.wav"
+    wav_path_alt = _audio_dir() / f"{memo_id}.wav"
 
     if not meta_path.exists():
         raise HTTPException(status_code=404, detail="memo not found")
@@ -125,6 +137,7 @@ def delete_memo(memo_id: str):
     # ロックファイルも一緒に削除
     Path(str(meta_path) + ".lock").unlink(missing_ok=True)
     wav_path.unlink(missing_ok=True)
+    wav_path_alt.unlink(missing_ok=True)
 
     return {"status": "deleted", "id": memo_id}
 
@@ -135,6 +148,7 @@ def delete_memo(memo_id: str):
 
 @app.get("/audio/{memo_id}")
 def get_audio(memo_id: str):
+    _validate_memo_id(memo_id)
     wav_path = _audio_dir() / f"{memo_id}.memo.wav"
     if not wav_path.exists():
         raise HTTPException(status_code=404, detail="audio not found")
@@ -172,6 +186,7 @@ def _transcribe_job(memo_id: str) -> None:
 
 @app.post("/api/transcribe/{memo_id}")
 def start_transcribe(memo_id: str):
+    _validate_memo_id(memo_id)
     path = _meta_dir() / f"{memo_id}.memo.json"
     if not path.exists():
         raise HTTPException(status_code=404, detail="memo not found")
@@ -218,7 +233,7 @@ def run_server(config: Config) -> None:
         import threading
         threading.Timer(1.0, webbrowser.open, args=(url,)).start()
 
-    uvicorn.run(app, host="0.0.0.0", port=config.server_port, log_level="warning")
+    uvicorn.run(app, host="127.0.0.1", port=config.server_port, log_level="warning")
 
 
 # ---------------------------------------------------------------------------

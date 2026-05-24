@@ -1,6 +1,8 @@
 """voice_memo.server FastAPI エンドポイントの振る舞いテスト"""
 
 import json
+import struct
+import wave
 from pathlib import Path
 from unittest.mock import patch
 
@@ -69,7 +71,7 @@ class TestListMemos:
 class TestGetMemo:
     def test_get_api_memos_id_returns_404_for_nonexistent_id(self, client):
         """GET /api/memos/{id} は存在しない ID に 404 を返す"""
-        response = client.get("/api/memos/nonexistent_id")
+        response = client.get("/api/memos/20240101_999999")
         assert response.status_code == 404
 
     def test_get_api_memos_id_returns_memo_for_existing_id(self, client, tmp_path):
@@ -100,7 +102,7 @@ class TestUpdateMemo:
     def test_put_api_memos_id_returns_404_for_nonexistent_id(self, client):
         """PUT /api/memos/{id} は存在しない ID に 404 を返す"""
         response = client.put(
-            "/api/memos/nonexistent_id",
+            "/api/memos/20240101_999999",
             json={"title": "test"},
         )
         assert response.status_code == 404
@@ -131,14 +133,14 @@ class TestDeleteMemo:
 
     def test_delete_api_memos_id_returns_404_for_nonexistent_id(self, client):
         """DELETE /api/memos/{id} は存在しない ID に 404 を返す"""
-        response = client.delete("/api/memos/nonexistent_id")
+        response = client.delete("/api/memos/20240101_999999")
         assert response.status_code == 404
 
 
 class TestStartTranscribe:
     def test_post_api_transcribe_id_returns_404_for_nonexistent_id(self, client):
         """POST /api/transcribe/{id} は存在しない ID に 404 を返す"""
-        response = client.post("/api/transcribe/nonexistent_id")
+        response = client.post("/api/transcribe/20240101_999999")
         assert response.status_code == 404
 
     def test_post_api_transcribe_id_returns_queued_for_existing_id(self, client, tmp_path):
@@ -152,3 +154,34 @@ class TestStartTranscribe:
 
         assert response.status_code == 200
         assert response.json() == {"status": "queued"}
+
+
+def _make_wav(path: Path) -> None:
+    """テスト用ダミー WAV ファイルを作成する"""
+    path.parent.mkdir(parents=True, exist_ok=True)
+    with wave.open(str(path), "wb") as wf:
+        wf.setnchannels(1)
+        wf.setsampwidth(2)
+        wf.setframerate(16000)
+        wf.writeframes(struct.pack("<h", 0) * 160)
+
+
+class TestGetAudio:
+    def test_get_audio_returns_wav_for_existing_memo(self, client, tmp_path):
+        """GET /audio/{id} は存在する音声ファイルを 200 で返す"""
+        audio_dir = tmp_path / "audio"
+        _make_wav(audio_dir / "20240101_120000.memo.wav")
+
+        response = client.get("/audio/20240101_120000")
+        assert response.status_code == 200
+        assert response.headers["content-type"] == "audio/wav"
+
+    def test_get_audio_returns_404_for_nonexistent_memo(self, client):
+        """GET /audio/{id} は存在しない memo_id に 404 を返す"""
+        response = client.get("/audio/20240101_999999")
+        assert response.status_code == 404
+
+    def test_get_audio_returns_400_for_invalid_memo_id_format(self, client):
+        """GET /audio/{id} は不正な memo_id フォーマットに 400 を返す"""
+        response = client.get("/audio/invalid_format")
+        assert response.status_code == 400

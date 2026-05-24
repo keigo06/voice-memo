@@ -69,7 +69,7 @@ def record() -> None:
         duration_sec = len(memo.audio_data) / memo.sample_rate
 
         save_dir = Path(config.save_dir).expanduser()
-        memo.save_wav(save_dir / "audio" / f"{memo.id}.wav")
+        memo.save_wav(save_dir / "audio" / f"{memo.id}.memo.wav")
         memo.save_json(save_dir / "meta" / f"{memo.id}.memo.json", duration_sec)
 
         click.echo(f"保存しました: {memo.id} ({duration_sec:.1f}秒)")
@@ -81,7 +81,7 @@ def record() -> None:
 @click.option("--tag", "tag", default=None, help="タグフィルタ")
 def list_cmd(show_all: bool, date_str: str | None, tag: str | None) -> None:
     """メモ一覧を表示する"""
-    import json as _json
+    from voice_memo.storage import read_meta
 
     config = load_config()
     meta_dir = Path(config.save_dir).expanduser() / "meta"
@@ -92,8 +92,7 @@ def list_cmd(show_all: bool, date_str: str | None, tag: str | None) -> None:
 
     records = []
     for p in meta_dir.glob("*.memo.json"):
-        with p.open(encoding="utf-8") as f:
-            records.append(_json.load(f))
+        records.append(read_meta(p))
 
     # 降順ソート
     records.sort(key=lambda r: r["unix_timestamp"], reverse=True)
@@ -184,8 +183,7 @@ def devices(set_name: str | None) -> None:
 @click.argument("memo_id", required=False, default=None)
 def transcribe(memo_id: str | None) -> None:
     """音声をテキストに変換する"""
-    import json as _json
-
+    from voice_memo.storage import read_meta
     from voice_memo.transcribe import transcribe_memo
 
     config = load_config()
@@ -202,14 +200,12 @@ def transcribe(memo_id: str | None) -> None:
         if not meta_path.exists():
             click.echo(f"エラー: メモが見つかりません: {memo_id}", err=True)
             raise SystemExit(1)
-        with meta_path.open(encoding="utf-8") as f:
-            records = [_json.load(f)]
+        records = [read_meta(meta_path)]
     else:
         # pending 全件を処理
         records = []
         for p in meta_dir.glob("*.memo.json"):
-            with p.open(encoding="utf-8") as f:
-                r = _json.load(f)
+            r = read_meta(p)
             if r.get("transcript_status") == "pending":
                 records.append(r)
         records.sort(key=lambda r: r.get("unix_timestamp", 0))
@@ -223,11 +219,7 @@ def transcribe(memo_id: str | None) -> None:
         rid = r["id"]
         duration = r.get("duration_sec", 0)
         meta_path = meta_dir / f"{rid}.memo.json"
-        wav_path = audio_dir / f"{rid}.wav"
-
-        if not wav_path.exists():
-            # recorder が .wav で保存している場合と .memo.wav の両方を試す
-            wav_path = audio_dir / f"{rid}.memo.wav"
+        wav_path = audio_dir / f"{rid}.memo.wav"
 
         click.echo(f"処理中: {rid} ({duration:.1f}秒)...")
 
