@@ -104,7 +104,8 @@ sample_rate: 16000
 channels: 1
 memo_max_duration: 300     # 最大録音秒数
 
-save_dir: "~/voice-memo/data"
+# save_dir を省略すると、読み込んだ config.yaml と同じディレクトリの data/ が使われる
+# save_dir: "/path/to/data"
 
 server_port: 8765
 open_browser: true
@@ -117,10 +118,11 @@ whisper_prompt: ""
 
 ## データ
 
-録音データは `~/voice-memo/data/` 以下に保存されます。
+録音データは、読み込まれた `config.yaml` と同じディレクトリの `data/` に保存されます。  
+例: `~/voice-memo/config.yaml` を使用している場合は `~/voice-memo/data/`。
 
 ```text
-~/voice-memo/data/
+<config.yaml のディレクトリ>/data/
 ├── audio/
 │   └── 20260520_143005.wav
 └── meta/
