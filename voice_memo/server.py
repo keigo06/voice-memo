@@ -231,7 +231,7 @@ def run_server(config: Config) -> None:
         import threading
         threading.Timer(1.0, webbrowser.open, args=(url,)).start()
 
-    uvicorn.run(app, host="0.0.0.0", port=config.server_port, log_level="warning")
+    uvicorn.run(app, host="127.0.0.1", port=config.server_port, log_level="warning")
 
 
 # ---------------------------------------------------------------------------
