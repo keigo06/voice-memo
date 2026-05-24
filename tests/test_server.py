@@ -1,6 +1,8 @@
 """voice_memo.server FastAPI エンドポイントの振る舞いテスト"""
 
 import json
+import struct
+import wave
 from pathlib import Path
 from unittest.mock import patch
 
@@ -152,3 +154,34 @@ class TestStartTranscribe:
 
         assert response.status_code == 200
         assert response.json() == {"status": "queued"}
+
+
+def _make_wav(path: Path) -> None:
+    """テスト用ダミー WAV ファイルを作成する"""
+    path.parent.mkdir(parents=True, exist_ok=True)
+    with wave.open(str(path), "wb") as wf:
+        wf.setnchannels(1)
+        wf.setsampwidth(2)
+        wf.setframerate(16000)
+        wf.writeframes(struct.pack("<h", 0) * 160)
+
+
+class TestGetAudio:
+    def test_get_audio_returns_wav_for_existing_memo(self, client, tmp_path):
+        """GET /audio/{id} は存在する音声ファイルを 200 で返す"""
+        audio_dir = tmp_path / "audio"
+        _make_wav(audio_dir / "20240101_120000.memo.wav")
+
+        response = client.get("/audio/20240101_120000")
+        assert response.status_code == 200
+        assert response.headers["content-type"] == "audio/wav"
+
+    def test_get_audio_returns_404_for_nonexistent_memo(self, client):
+        """GET /audio/{id} は存在しない memo_id に 404 を返す"""
+        response = client.get("/audio/20240101_999999")
+        assert response.status_code == 404
+
+    def test_get_audio_returns_400_for_invalid_memo_id_format(self, client):
+        """GET /audio/{id} は不正な memo_id フォーマットに 400 を返す"""
+        response = client.get("/audio/invalid_format")
+        assert response.status_code == 400
