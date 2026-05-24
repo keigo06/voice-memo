@@ -23,7 +23,7 @@ def test_load_config_returns_defaults_when_no_file_exists(tmp_path, monkeypatch)
     assert cfg.sample_rate == 16000
     assert cfg.channels == 1
     assert cfg.memo_max_duration == 300
-    assert cfg.save_dir == "~/voice-memo/data"
+    assert cfg.save_dir == str(tmp_path / "voice-memo" / "data")
     assert cfg.server_port == 8765
     assert cfg.open_browser is True
     assert cfg.whisper_model == "small"
@@ -58,6 +58,39 @@ def test_load_config_overrides_with_yaml_values(tmp_path, monkeypatch):
     assert cfg.server_port == 9000
     # 指定していない値はデフォルト
     assert cfg.channels == 1
+
+
+def test_load_config_save_dir_defaults_to_config_dir(tmp_path, monkeypatch):
+    """save_dir 未指定のとき、config.yaml と同じディレクトリの data/ がデフォルトになる"""
+    cfg_file = tmp_path / "myproject" / "config.yaml"
+    cfg_file.parent.mkdir(parents=True)
+    cfg_file.write_text("sample_rate: 16000\n")
+
+    monkeypatch.setattr(
+        "voice_memo.config._repo_config",
+        lambda: tmp_path / "nonexistent.yaml",
+    )
+    monkeypatch.setenv("HOME", str(tmp_path))
+
+    cfg = load_config(path=cfg_file)
+
+    assert cfg.save_dir == str(tmp_path / "myproject" / "data")
+
+
+def test_load_config_explicit_save_dir_is_respected(tmp_path, monkeypatch):
+    """config.yaml に save_dir が明示されているときはその値を使う"""
+    cfg_file = tmp_path / "config.yaml"
+    cfg_file.write_text("save_dir: /custom/path/data\n")
+
+    monkeypatch.setattr(
+        "voice_memo.config._repo_config",
+        lambda: tmp_path / "nonexistent.yaml",
+    )
+    monkeypatch.setenv("HOME", str(tmp_path))
+
+    cfg = load_config(path=cfg_file)
+
+    assert cfg.save_dir == "/custom/path/data"
 
 
 def test_load_config_home_yaml_takes_priority_over_repo_yaml(tmp_path, monkeypatch):

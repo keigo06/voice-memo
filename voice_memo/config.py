@@ -35,18 +35,27 @@ def load_config(path: Path | None = None) -> Config:
     candidates.append(_repo_config())
 
     raw: dict = {}
+    found: Path | None = None
     for candidate in candidates:
         if candidate.exists():
             with candidate.open() as f:
                 raw = yaml.safe_load(f) or {}
+            found = candidate
             break
+
+    # save_dir が未指定の場合は、見つかった config.yaml と同じディレクトリの data/ を使う
+    if "save_dir" not in raw:
+        base = found.parent if found is not None else Path("~/voice-memo").expanduser()
+        default_save_dir = str(base / "data")
+    else:
+        default_save_dir = raw["save_dir"]
 
     return Config(
         device_name=raw.get("device_name", None),
         sample_rate=raw.get("sample_rate", 16000),
         channels=raw.get("channels", 1),
         memo_max_duration=raw.get("memo_max_duration", 300),
-        save_dir=raw.get("save_dir", "~/voice-memo/data"),
+        save_dir=default_save_dir,
         server_port=raw.get("server_port", 8765),
         open_browser=raw.get("open_browser", True),
         whisper_model=raw.get("whisper_model", "small"),
