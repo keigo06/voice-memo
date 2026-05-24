@@ -128,6 +128,7 @@ def delete_memo(memo_id: str):
     _validate_memo_id(memo_id)
     meta_path = _meta_dir() / f"{memo_id}.memo.json"
     wav_path = _audio_dir() / f"{memo_id}.memo.wav"
+    wav_path_alt = _audio_dir() / f"{memo_id}.wav"
 
     if not meta_path.exists():
         raise HTTPException(status_code=404, detail="memo not found")
@@ -136,6 +137,7 @@ def delete_memo(memo_id: str):
     # ロックファイルも一緒に削除
     Path(str(meta_path) + ".lock").unlink(missing_ok=True)
     wav_path.unlink(missing_ok=True)
+    wav_path_alt.unlink(missing_ok=True)
 
     return {"status": "deleted", "id": memo_id}
 
