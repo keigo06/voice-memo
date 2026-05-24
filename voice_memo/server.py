@@ -149,7 +149,9 @@ def delete_memo(memo_id: str):
 @app.get("/audio/{memo_id}")
 def get_audio(memo_id: str):
     _validate_memo_id(memo_id)
-    wav_path = _audio_dir() / f"{memo_id}.memo.wav"
+    wav_path = _audio_dir() / f"{memo_id}.wav"
+    if not wav_path.exists():
+        wav_path = _audio_dir() / f"{memo_id}.memo.wav"
     if not wav_path.exists():
         raise HTTPException(status_code=404, detail="audio not found")
     return FileResponse(

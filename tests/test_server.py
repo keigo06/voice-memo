@@ -176,6 +176,15 @@ class TestGetAudio:
         assert response.status_code == 200
         assert response.headers["content-type"] == "audio/wav"
 
+    def test_get_audio_returns_wav_for_plain_wav_filename(self, client, tmp_path):
+        """GET /audio/{id} は {id}.wav ファイルを {id}.memo.wav より優先して返す"""
+        audio_dir = tmp_path / "audio"
+        _make_wav(audio_dir / "20240101_120000.wav")
+
+        response = client.get("/audio/20240101_120000")
+        assert response.status_code == 200
+        assert response.headers["content-type"] == "audio/wav"
+
     def test_get_audio_returns_404_for_nonexistent_memo(self, client):
         """GET /audio/{id} は存在しない memo_id に 404 を返す"""
         response = client.get("/audio/20240101_999999")
