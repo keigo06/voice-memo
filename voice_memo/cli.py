@@ -7,7 +7,7 @@ from pathlib import Path
 
 import click
 
-from voice_memo.config import load_config
+from voice_memo.config import load_config, user_config
 from voice_memo.recorder import AudioRecorder, RecorderConfig
 
 
@@ -149,7 +149,7 @@ def devices(set_name: str | None) -> None:
     config = load_config()
 
     if set_name is not None:
-        config_path = Path("~/voice-memo/config.yaml").expanduser()
+        config_path = user_config()
         if config_path.exists():
             with config_path.open(encoding="utf-8") as f:
                 raw = yaml.safe_load(f) or {}
@@ -242,14 +242,15 @@ def setup() -> None:
 
     click.echo("セットアップを開始します...")
 
-    base_dir = Path("~/voice-memo").expanduser()
+    config_path = user_config()
+    base_dir = config_path.parent
     data_dir = base_dir / "data"
     for sub in ("audio", "meta"):
         (data_dir / sub).mkdir(parents=True, exist_ok=True)
     (base_dir / "logs").mkdir(parents=True, exist_ok=True)
     click.echo(f"  データディレクトリを作成: {data_dir}/")
 
-    config_dest = base_dir / "config.yaml"
+    config_dest = config_path
     if not config_dest.exists():
         repo_config = Path(__file__).parent.parent / "config.yaml"
         if repo_config.exists():
