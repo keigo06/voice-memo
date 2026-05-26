@@ -38,7 +38,7 @@ def load_config(path: Path | None = None) -> Config:
     found: Path | None = None
     for candidate in candidates:
         if candidate.exists():
-            with candidate.open() as f:
+            with candidate.open(encoding="utf-8") as f:
                 raw = yaml.safe_load(f) or {}
             found = candidate
             break

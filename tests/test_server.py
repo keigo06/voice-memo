@@ -175,6 +175,18 @@ class TestStartTranscribe:
             data = json.load(f)
         assert data["transcript_status"] == "processing"
 
+    def test_post_api_transcribe_reverts_status_on_submit_failure(self, client, tmp_path):
+        """executor.submit が失敗したとき transcript_status が pending に戻る"""
+        meta_dir = tmp_path / "meta"
+        path = _make_meta_file(meta_dir, "20240101_120000")
+
+        with patch.object(server_module._executor, "submit", side_effect=RuntimeError("full")):
+            response = client.post("/api/transcribe/20240101_120000")
+
+        assert response.status_code == 503
+        data = json.loads(path.read_text(encoding="utf-8"))
+        assert data["transcript_status"] == "pending"
+
 
 def _make_wav(path: Path) -> None:
     """テスト用ダミー WAV ファイルを作成する"""
@@ -205,3 +217,16 @@ class TestGetAudio:
         """GET /audio/{id} は不正な memo_id フォーマットに 400 を返す"""
         response = client.get("/audio/invalid_format")
         assert response.status_code == 400
+
+
+class TestConfigGuards:
+    def test_meta_dir_raises_runtime_error_when_config_not_set(self):
+        """_config が None のとき _meta_dir() は RuntimeError を送出する"""
+        import voice_memo.server as s
+        original = s._config
+        s._config = None
+        try:
+            with pytest.raises(RuntimeError, match="_config"):
+                s._meta_dir()
+        finally:
+            s._config = original
