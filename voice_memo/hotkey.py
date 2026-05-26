@@ -40,13 +40,31 @@ class HotkeyRecorder:
         self._recorder.start()
         self._is_recording = True
         logger.info("録音開始 (ホットキー)")
+        # max_duration 後に自動停止するバックグラウンドスレッド
+        threading.Thread(target=self._auto_stop_on_timeout, daemon=True).start()
+
+    def _auto_stop_on_timeout(self) -> None:
+        recorder = self._recorder
+        if recorder is None:
+            return
+        recorder.stop_event.wait()
+        with self._lock:
+            if self._is_recording and self._recorder is recorder:
+                logger.info("最大録音時間に達したため自動停止します")
+                print("\n最大録音時間に達しました。自動保存します。", flush=True)
+                self._stop()
 
     def _stop(self) -> None:
         self._is_recording = False
         if self._recorder is None:
             return
-        memo = self._recorder.stop()
-        self._recorder = None
+        recorder = self._recorder
+        self._recorder = None  # clear reference before stop() to prevent double-stop
+        try:
+            memo = recorder.stop()
+        except Exception:
+            logger.exception("録音の停止に失敗しました")
+            return
 
         duration_sec = len(memo.audio_data) / memo.sample_rate
         save_dir = Path(self._config.save_dir).expanduser()
