@@ -188,18 +188,9 @@ def _make_wav(path: Path) -> None:
 
 class TestGetAudio:
     def test_get_audio_returns_wav_for_existing_memo(self, client, tmp_path):
-        """GET /audio/{id} は存在する音声ファイルを 200 で返す"""
+        """GET /audio/{id} は {id}.memo.wav ファイルを 200 で返す"""
         audio_dir = tmp_path / "audio"
         _make_wav(audio_dir / "20240101_120000.memo.wav")
-
-        response = client.get("/audio/20240101_120000")
-        assert response.status_code == 200
-        assert response.headers["content-type"] == "audio/wav"
-
-    def test_get_audio_returns_wav_for_plain_wav_filename(self, client, tmp_path):
-        """GET /audio/{id} は {id}.wav ファイルを {id}.memo.wav より優先して返す"""
-        audio_dir = tmp_path / "audio"
-        _make_wav(audio_dir / "20240101_120000.wav")
 
         response = client.get("/audio/20240101_120000")
         assert response.status_code == 200

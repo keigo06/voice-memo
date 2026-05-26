@@ -4,7 +4,6 @@ import socket
 import webbrowser
 from concurrent.futures import ThreadPoolExecutor
 from pathlib import Path
-from typing import Optional
 
 logger = logging.getLogger(__name__)
 
@@ -63,8 +62,8 @@ def _load_all_memos() -> list[dict]:
 # ---------------------------------------------------------------------------
 
 class MemoUpdate(BaseModel):
-    title: Optional[str] = None
-    tags: Optional[list[str]] = None
+    title: str | None = None
+    tags: list[str] | None = None
 
 
 # ---------------------------------------------------------------------------
@@ -73,10 +72,10 @@ class MemoUpdate(BaseModel):
 
 @app.get("/api/memos")
 def list_memos(
-    q: Optional[str] = Query(default=None),
-    tag: Optional[str] = Query(default=None),
-    date: Optional[str] = Query(default=None),
-    limit: Optional[int] = Query(default=None, ge=0),
+    q: str | None = Query(default=None),
+    tag: str | None = Query(default=None),
+    date: str | None = Query(default=None),
+    limit: int | None = Query(default=None, ge=0),
 ):
     records = _load_all_memos()
 
@@ -131,16 +130,13 @@ def delete_memo(memo_id: str):
     _validate_memo_id(memo_id)
     meta_path = _meta_dir() / f"{memo_id}.memo.json"
     wav_path = _audio_dir() / f"{memo_id}.memo.wav"
-    wav_path_alt = _audio_dir() / f"{memo_id}.wav"
 
     if not meta_path.exists():
         raise HTTPException(status_code=404, detail="memo not found")
 
     meta_path.unlink(missing_ok=True)
-    # ロックファイルも一緒に削除
     Path(str(meta_path) + ".lock").unlink(missing_ok=True)
     wav_path.unlink(missing_ok=True)
-    wav_path_alt.unlink(missing_ok=True)
 
     return {"status": "deleted", "id": memo_id}
 
@@ -152,9 +148,7 @@ def delete_memo(memo_id: str):
 @app.get("/audio/{memo_id}")
 def get_audio(memo_id: str):
     _validate_memo_id(memo_id)
-    wav_path = _audio_dir() / f"{memo_id}.wav"
-    if not wav_path.exists():
-        wav_path = _audio_dir() / f"{memo_id}.memo.wav"
+    wav_path = _audio_dir() / f"{memo_id}.memo.wav"
     if not wav_path.exists():
         raise HTTPException(status_code=404, detail="audio not found")
     return FileResponse(
@@ -164,27 +158,14 @@ def get_audio(memo_id: str):
     )
 
 
-# ---------------------------------------------------------------------------
-# Transcribe job (stub – Phase 5 will replace _run_transcribe)
-# ---------------------------------------------------------------------------
-
-def _run_transcribe(memo_id: str) -> None:
+def _transcribe_job(memo_id: str) -> None:
     assert _config is not None
     meta_path = _meta_dir() / f"{memo_id}.memo.json"
-    wav_path = _audio_dir() / f"{memo_id}.wav"
-    if not wav_path.exists():
-        wav_path = _audio_dir() / f"{memo_id}.memo.wav"
-    transcribe_memo(memo_id, wav_path, meta_path, _config)
-
-
-def _transcribe_job(memo_id: str) -> None:
-    """バックグラウンドスレッドで実行されるジョブ。processing → done/failed に更新する。"""
-    path = _meta_dir() / f"{memo_id}.memo.json"
-    if not path.exists():
+    if not meta_path.exists():
         return
-
+    wav_path = _audio_dir() / f"{memo_id}.memo.wav"
     try:
-        _run_transcribe(memo_id)
+        transcribe_memo(memo_id, wav_path, meta_path, _config)
     except Exception:
         pass
 
