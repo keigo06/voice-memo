@@ -340,3 +340,16 @@ def server() -> None:
     from voice_memo.server import run_server
     config = load_config()
     run_server(config)
+
+
+@main.command()
+@click.option("--hotkey", "hotkey_str", default=None, metavar="HOTKEY",
+              help="ホットキー文字列（例: '<ctrl>+<alt>+r'）。未指定時は config.yaml の値を使用")
+def hotkey(hotkey_str: str | None) -> None:
+    """グローバルホットキーで録音を開始/停止する"""
+    from voice_memo.hotkey import run_hotkey_listener
+
+    config = load_config()
+    if hotkey_str is not None:
+        config.hotkey = hotkey_str
+    run_hotkey_listener(config)

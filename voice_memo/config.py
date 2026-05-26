@@ -17,6 +17,7 @@ class Config:
     whisper_language: str = "ja"
     whisper_device: str = "cpu"
     whisper_prompt: str = ""
+    hotkey: str = "<ctrl>+<alt>+r"
 
 
 def _repo_config() -> Path:
@@ -62,4 +63,5 @@ def load_config(path: Path | None = None) -> Config:
         whisper_language=raw.get("whisper_language", "ja"),
         whisper_device=raw.get("whisper_device", "cpu"),
         whisper_prompt=raw.get("whisper_prompt", ""),
+        hotkey=raw.get("hotkey", "<ctrl>+<alt>+r"),
     )
