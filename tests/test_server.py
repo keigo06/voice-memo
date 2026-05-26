@@ -175,6 +175,18 @@ class TestStartTranscribe:
             data = json.load(f)
         assert data["transcript_status"] == "processing"
 
+    def test_post_api_transcribe_reverts_status_on_submit_failure(self, client, tmp_path):
+        """executor.submit が失敗したとき transcript_status が pending に戻る"""
+        meta_dir = tmp_path / "meta"
+        path = _make_meta_file(meta_dir, "20240101_120000")
+
+        with patch.object(server_module._executor, "submit", side_effect=RuntimeError("full")):
+            response = client.post("/api/transcribe/20240101_120000")
+
+        assert response.status_code == 503
+        data = json.loads(path.read_text(encoding="utf-8"))
+        assert data["transcript_status"] == "pending"
+
 
 def _make_wav(path: Path) -> None:
     """テスト用ダミー WAV ファイルを作成する"""

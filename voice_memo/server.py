@@ -187,7 +187,13 @@ def start_transcribe(memo_id: str):
     data["transcript_status"] = "processing"
     write_meta(path, data)
 
-    _executor.submit(_transcribe_job, memo_id)
+    try:
+        _executor.submit(_transcribe_job, memo_id)
+    except Exception:
+        data["transcript_status"] = "pending"
+        write_meta(path, data)
+        raise HTTPException(status_code=503, detail="transcription queue is full")
+
     return {"status": "queued"}
 
 
