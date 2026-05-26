@@ -17,6 +17,9 @@ class Config:
     whisper_language: str = "ja"
     whisper_device: str = "cpu"
     whisper_prompt: str = ""
+    whisper_beam_size: int = 5
+    whisper_vad_filter: bool = False
+    whisper_compute_type: str = "int8"
     hotkey: str = "<ctrl>+<alt>+r"
 
 
@@ -63,5 +66,8 @@ def load_config(path: Path | None = None) -> Config:
         whisper_language=raw.get("whisper_language", "ja"),
         whisper_device=raw.get("whisper_device", "cpu"),
         whisper_prompt=raw.get("whisper_prompt", ""),
+        whisper_beam_size=raw.get("whisper_beam_size", 5),
+        whisper_vad_filter=raw.get("whisper_vad_filter", False),
+        whisper_compute_type=raw.get("whisper_compute_type", "int8"),
         hotkey=raw.get("hotkey", "<ctrl>+<alt>+r"),
     )

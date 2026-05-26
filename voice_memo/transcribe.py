@@ -24,7 +24,11 @@ def transcribe_memo(
     write_meta(meta_path, data)
 
     try:
-        model = WhisperModel(config.whisper_model, device=config.whisper_device)
+        model = WhisperModel(
+            config.whisper_model,
+            device=config.whisper_device,
+            compute_type=config.whisper_compute_type,
+        )
 
         # 空文字列は initial_prompt に渡すと挙動が変わるため None に変換
         initial_prompt = config.whisper_prompt or None
@@ -33,6 +37,8 @@ def transcribe_memo(
             str(wav_path),
             language=config.whisper_language,
             initial_prompt=initial_prompt,
+            beam_size=config.whisper_beam_size,
+            vad_filter=config.whisper_vad_filter,
         )
 
         # segments はジェネレータなので全件消費してから結合

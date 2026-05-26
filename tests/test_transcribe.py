@@ -112,3 +112,39 @@ class TestTranscribeMemo:
             transcribe_memo("20240101_120000", wav_path, meta_path, _default_config())
 
         assert "processing" in observed_statuses
+
+    def test_transcribe_memo_passes_beam_size_to_model(self, tmp_path):
+        """beam_size が model.transcribe() に渡される"""
+        meta_path = tmp_path / "memo.json"
+        wav_path = tmp_path / "memo.wav"
+        wav_path.touch()
+        _make_meta(meta_path)
+
+        cfg = Config(whisper_beam_size=10, whisper_vad_filter=True, whisper_compute_type="int8")
+
+        with patch("voice_memo.transcribe.WhisperModel") as MockModel:
+            instance = MockModel.return_value
+            instance.transcribe.return_value = ([], MagicMock())
+
+            transcribe_memo("20240101_120000", wav_path, meta_path, cfg)
+
+            call_kwargs = instance.transcribe.call_args[1]
+            assert call_kwargs["beam_size"] == 10
+            assert call_kwargs["vad_filter"] is True
+
+    def test_transcribe_memo_passes_compute_type_to_model_constructor(self, tmp_path):
+        """compute_type が WhisperModel() コンストラクタに渡される"""
+        meta_path = tmp_path / "memo.json"
+        wav_path = tmp_path / "memo.wav"
+        wav_path.touch()
+        _make_meta(meta_path)
+
+        cfg = Config(whisper_model="large-v3", whisper_compute_type="float16")
+
+        with patch("voice_memo.transcribe.WhisperModel") as MockModel:
+            instance = MockModel.return_value
+            instance.transcribe.return_value = ([], MagicMock())
+
+            transcribe_memo("20240101_120000", wav_path, meta_path, cfg)
+
+            MockModel.assert_called_once_with("large-v3", device="cpu", compute_type="float16")

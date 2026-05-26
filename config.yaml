@@ -20,6 +20,11 @@ whisper_device: "cpu"       # cpu / cuda
 whisper_prompt: ""          # 専門用語を渡すプロンプト
                             # 例: "ロボット実験の音声メモ。ROS、IMU、ヨー角などの用語が含まれる。"
 
+# --- 文字起こし精度設定 ---
+# whisper_beam_size: 5        # 大きいほど高精度・低速（推奨: 通常=5, 高精度=10）
+# whisper_vad_filter: false   # true にすると無音区間を除去して精度向上
+# whisper_compute_type: "int8" # CPU: "int8"(速い) / "float32"(精度高い)  GPU: "float16"
+
 # ホットキー（録音開始/停止トグル）
 # pynput 形式: <ctrl>+<alt>+r など
 # hotkey: "<ctrl>+<alt>+r"
