@@ -1,7 +1,6 @@
 import logging
 import sys
 import threading
-import time
 from pathlib import Path
 
 from voice_memo.config import Config
@@ -43,10 +42,10 @@ class HotkeyRecorder:
         logger.info("録音開始 (ホットキー)")
 
     def _stop(self) -> None:
+        self._is_recording = False
         if self._recorder is None:
             return
         memo = self._recorder.stop()
-        self._is_recording = False
         self._recorder = None
 
         duration_sec = len(memo.audio_data) / memo.sample_rate
