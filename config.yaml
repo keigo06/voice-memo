@@ -19,3 +19,7 @@ whisper_language: "ja"      # 明示することで精度向上・高速化
 whisper_device: "cpu"       # cpu / cuda
 whisper_prompt: ""          # 専門用語を渡すプロンプト
                             # 例: "ロボット実験の音声メモ。ROS、IMU、ヨー角などの用語が含まれる。"
+
+# ホットキー（録音開始/停止トグル）
+# pynput 形式: <ctrl>+<alt>+r など
+# hotkey: "<ctrl>+<alt>+r"
