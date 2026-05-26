@@ -35,6 +35,22 @@ CLI（`vmemo`）と FastAPI ベースの Web UI を提供する。
 - `voice_memo/server.py` — FastAPI エンドポイント + インライン HTML フロントエンド
 - `voice_memo/cli.py` — Click CLI コマンド群（`record` / `list` / `transcribe` / `server` 他）
 
+## Git Workflow
+
+**ブランチ戦略:** Git Flow  
+`main`（タグ付きリリース）← `develop`（統合）← `feature/*` / `fix/*` / `refactor/*`
+
+**通常のPR（→ develop）:**
+1. `gh pr create --base develop`
+2. CI が自動で `@copilot review` コメントを投稿
+3. 数分後にレビューを確認し対応（`/schedule 5m` でClaudeに返信させることも可能）
+4. `gh pr merge --squash`（スカッシュマージのみ許可）
+
+**リリース（develop → main）:**
+1. `gh pr create --base main --title "chore: release vX.Y.Z"`
+2. スカッシュマージ後: `git tag vX.Y.Z && git push origin vX.Y.Z`
+3. `release.yml` が GitHub Release を自動作成
+
 ## Superpowers Overrides
 
 - git worktrees: skip（単独開発のため不要）
