@@ -60,12 +60,16 @@ class MemoRecord:
 
 def find_device(name: str | None) -> int | None:
     """名前の部分一致でデバイスを検索。見つからない場合は None (デフォルト) を返す"""
+    if name is None:
+        return None
+
     try:
         import sounddevice as sd
     except ImportError:
+        logger.warning(f"sounddevice が未インストールのため、デバイス '{name}' を指定できません。デフォルトを使用します。")
         return None
-
-    if name is None:
+    except OSError:
+        logger.warning(f"sounddevice の初期化に失敗したため、デバイス '{name}' を指定できません。デフォルトを使用します。")
         return None
 
     devices = sd.query_devices()
@@ -127,6 +131,18 @@ class AudioRecorder:
 
     def stop(self) -> MemoRecord:
         """InputStream を停止し、キューをフラッシュして MemoRecord を返す"""
+        if self._start_time == 0.0:
+            ts = time.time()
+            created_at = datetime.fromtimestamp(ts, tz=timezone.utc).astimezone()
+            return MemoRecord(
+                id=created_at.strftime("%Y%m%d_%H%M%S"),
+                unix_timestamp=ts,
+                audio_data=np.zeros(0, dtype=np.float32),
+                sample_rate=self._config.sample_rate,
+                created_at=created_at,
+                channels=self._config.channels,
+            )
+
         if self._timer is not None:
             self._timer.cancel()
 
