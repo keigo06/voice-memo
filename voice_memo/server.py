@@ -68,6 +68,11 @@ class MemoUpdate(BaseModel):
     tags: list[str] | None = None
 
 
+class TranscribeRequest(BaseModel):
+    model: str | None = None
+    accurate: bool = False
+
+
 # ---------------------------------------------------------------------------
 # API endpoints – memo CRUD
 # ---------------------------------------------------------------------------
@@ -160,21 +165,30 @@ def get_audio(memo_id: str):
     )
 
 
-def _transcribe_job(memo_id: str) -> None:
+def _transcribe_job(memo_id: str, model: str | None = None, accurate: bool = False) -> None:
     if _config is None:
         return
+    import copy
+    cfg = copy.copy(_config)
+    if accurate:
+        cfg.whisper_model = "large-v3-turbo"
+        cfg.whisper_beam_size = 10
+        cfg.whisper_vad_filter = True
+    if model is not None:
+        cfg.whisper_model = model
+
     meta_path = _meta_dir() / f"{memo_id}.memo.json"
     if not meta_path.exists():
         return
     wav_path = _audio_dir() / f"{memo_id}.memo.wav"
     try:
-        transcribe_memo(memo_id, wav_path, meta_path, _config)
+        transcribe_memo(memo_id, wav_path, meta_path, cfg)
     except Exception:
         pass
 
 
 @app.post("/api/transcribe/{memo_id}")
-def start_transcribe(memo_id: str):
+def start_transcribe(memo_id: str, body: TranscribeRequest = TranscribeRequest()):
     _validate_memo_id(memo_id)
     path = _meta_dir() / f"{memo_id}.memo.json"
     if not path.exists():
@@ -188,7 +202,7 @@ def start_transcribe(memo_id: str):
     write_meta(path, data)
 
     try:
-        _executor.submit(_transcribe_job, memo_id)
+        _executor.submit(_transcribe_job, memo_id, body.model, body.accurate)
     except Exception:
         data["transcript_status"] = "pending"
         write_meta(path, data)
@@ -344,6 +358,12 @@ _HTML = """<!DOCTYPE html>
     <div id="transcript-box">-</div>
   </div>
   <div class="action-row">
+    <select id="model-select" style="padding:6px 8px;border:1px solid #ccc;border-radius:4px;font-size:13px;">
+      <option value="">通常 (small)</option>
+      <option value="accurate">高精度 (large-v3-turbo)</option>
+      <option value="medium">medium</option>
+      <option value="large-v3">large-v3</option>
+    </select>
     <button class="btn btn-primary" id="transcribe-btn" onclick="startTranscribe()">文字起こし開始</button>
     <span id="transcribe-status" style="font-size:12px;color:#666;"></span>
     <button class="btn btn-danger" style="margin-left:auto;" onclick="deleteMemo()">削除</button>
@@ -522,7 +542,16 @@ document.getElementById('title-input').addEventListener('blur', async () => {
 // -----------------------------------------------------------------------
 async function startTranscribe() {
   if (!_currentId) return;
-  const res = await fetch(`/api/transcribe/${_currentId}`, { method: 'POST' });
+  const sel = document.getElementById('model-select').value;
+  const body = sel === 'accurate'
+    ? { accurate: true }
+    : sel ? { model: sel }
+    : {};
+  const res = await fetch(`/api/transcribe/${_currentId}`, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify(body),
+  });
   if (!res.ok) return;
   document.getElementById('transcribe-status').textContent = 'キューに追加しました';
   updateTranscribeBtn('processing');
