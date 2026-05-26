@@ -27,6 +27,7 @@ class TestHotkeyRecorder:
 
         with patch("voice_memo.hotkey.AudioRecorder") as MockRec:
             instance = MockRec.return_value
+            instance.stop_event = threading.Event()
             recorder.toggle()
             instance.start.assert_called_once()
             assert recorder.is_recording
@@ -41,6 +42,7 @@ class TestHotkeyRecorder:
 
         with patch("voice_memo.hotkey.AudioRecorder") as MockRec:
             instance = MockRec.return_value
+            instance.stop_event = threading.Event()
             instance.stop.return_value = _make_fake_memo()
             recorder.toggle()   # start
             recorder.toggle()   # stop
@@ -58,6 +60,7 @@ class TestHotkeyRecorder:
 
         with patch("voice_memo.hotkey.AudioRecorder") as MockRec:
             instance = MockRec.return_value
+            instance.stop_event = threading.Event()
             instance.stop.return_value = memo
             recorder.toggle()
             recorder.toggle()
