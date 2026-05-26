@@ -110,3 +110,15 @@ def test_load_config_home_yaml_takes_priority_over_repo_yaml(tmp_path, monkeypat
     cfg = load_config()
 
     assert cfg.server_port == 1111
+
+
+def test_load_config_reads_utf8_yaml_with_japanese_content(tmp_path, monkeypatch):
+    """日本語を含む config.yaml を正しく読み込める"""
+    cfg_file = tmp_path / "config.yaml"
+    cfg_file.write_text("whisper_prompt: テストプロンプト\n", encoding="utf-8")
+
+    monkeypatch.setattr("voice_memo.config._repo_config", lambda: tmp_path / "nonexistent.yaml")
+    monkeypatch.setenv("HOME", str(tmp_path))
+
+    cfg = load_config(path=cfg_file)
+    assert cfg.whisper_prompt == "テストプロンプト"
