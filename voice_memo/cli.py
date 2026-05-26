@@ -180,11 +180,25 @@ def devices(set_name: str | None) -> None:
 
 @main.command()
 @click.argument("memo_id", required=False, default=None)
-def transcribe(memo_id: str | None) -> None:
+@click.option("--accurate", is_flag=True, default=False,
+              help="高精度モード: large-v3 モデル + beam_size=10 + VAD フィルタ")
+@click.option("--model", "model_name", default=None,
+              help="使用するモデルを指定 (tiny/base/small/medium/large-v3 など)")
+def transcribe(memo_id: str | None, accurate: bool, model_name: str | None) -> None:
     """音声をテキストに変換する"""
     from voice_memo.transcribe import transcribe_memo
 
     config = load_config()
+
+    if accurate:
+        config.whisper_model = "large-v3"
+        config.whisper_beam_size = 10
+        config.whisper_vad_filter = True
+        click.echo("高精度モード: large-v3 + beam_size=10 + VAD")
+
+    if model_name is not None:
+        config.whisper_model = model_name
+
     meta_dir = Path(config.save_dir).expanduser() / "meta"
     audio_dir = Path(config.save_dir).expanduser() / "audio"
 
