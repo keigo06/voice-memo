@@ -66,10 +66,7 @@ def find_device(name: str | None) -> int | None:
     try:
         import sounddevice as sd
     except (ImportError, OSError):
-        logger.warning(
-            f"sounddevice を利用できないため、デバイス '{name}' を指定できません。"
-            "デフォルトを使用します。"
-        )
+        logger.warning(f"sounddevice を利用できないため、デバイス '{name}' を指定できません。デフォルトを使用します。")
         return None
 
     devices = sd.query_devices()
