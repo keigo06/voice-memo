@@ -124,7 +124,7 @@ whisper_prompt: ""
 ```text
 <config.yaml のディレクトリ>/data/
 ├── audio/
-│   └── 20260520_143005.wav
+│   └── 20260520_143005.memo.wav
 └── meta/
     └── 20260520_143005.memo.json
 ```
@@ -150,10 +150,10 @@ whisper_prompt: ""
 ## テスト
 
 ```bash
-make test
+pytest
 ```
 
-ROS 環境で `PYTHONPATH` が設定されている場合も `make test` が正しく動作します。
+ROS 環境で `PYTHONPATH` が汚染されている場合も、`pyproject.toml` の `addopts` で ROS 側プラグインを無効化しているためそのまま動作します。
 
 ## 依存ライブラリ
 
