@@ -144,3 +144,29 @@ class TestFindDevice:
                 del sys.modules["sounddevice"]
 
         assert result == 0
+
+
+def test_audio_recorder_stop_before_start_returns_empty_record(monkeypatch):
+    """start() 前に stop() を呼んでも空の MemoRecord を返す"""
+    import sys
+    from voice_memo.recorder import AudioRecorder, RecorderConfig
+
+    class FakeSD:
+        @staticmethod
+        def query_devices():
+            return []
+        class InputStream:
+            def __init__(self, **kwargs): pass
+            def start(self): pass
+            def stop(self): pass
+            def close(self): pass
+
+    sys.modules["sounddevice"] = FakeSD()
+    try:
+        cfg = RecorderConfig(device_name=None, sample_rate=16000, channels=1, max_duration=300)
+        recorder = AudioRecorder(cfg)
+        memo = recorder.stop()
+        assert len(memo.audio_data) == 0
+        assert memo.sample_rate == 16000
+    finally:
+        del sys.modules["sounddevice"]

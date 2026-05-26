@@ -127,6 +127,18 @@ class AudioRecorder:
 
     def stop(self) -> MemoRecord:
         """InputStream を停止し、キューをフラッシュして MemoRecord を返す"""
+        if self._start_time == 0.0:
+            ts = time.time()
+            created_at = datetime.fromtimestamp(ts, tz=timezone.utc).astimezone()
+            return MemoRecord(
+                id=created_at.strftime("%Y%m%d_%H%M%S"),
+                unix_timestamp=ts,
+                audio_data=np.zeros(0, dtype=np.float32),
+                sample_rate=self._config.sample_rate,
+                created_at=created_at,
+                channels=self._config.channels,
+            )
+
         if self._timer is not None:
             self._timer.cancel()
 
