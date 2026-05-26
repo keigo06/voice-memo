@@ -60,12 +60,13 @@ class MemoRecord:
 
 def find_device(name: str | None) -> int | None:
     """名前の部分一致でデバイスを検索。見つからない場合は None (デフォルト) を返す"""
-    try:
-        import sounddevice as sd
-    except ImportError:
+    if name is None:
         return None
 
-    if name is None:
+    try:
+        import sounddevice as sd
+    except (ImportError, OSError):
+        logger.warning(f"デバイス '{name}' が見つかりません。デフォルトを使用します。")
         return None
 
     devices = sd.query_devices()
