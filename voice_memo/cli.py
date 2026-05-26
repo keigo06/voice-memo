@@ -3,12 +3,14 @@ import signal
 import sys
 import threading
 import time
+from datetime import datetime
 from pathlib import Path
 
 import click
 
 from voice_memo.config import load_config
 from voice_memo.recorder import AudioRecorder, RecorderConfig
+from voice_memo.storage import read_meta
 
 
 @click.group()
@@ -81,8 +83,6 @@ def record() -> None:
 @click.option("--tag", "tag", default=None, help="タグフィルタ")
 def list_cmd(show_all: bool, date_str: str | None, tag: str | None) -> None:
     """メモ一覧を表示する"""
-    from voice_memo.storage import read_meta
-
     config = load_config()
     meta_dir = Path(config.save_dir).expanduser() / "meta"
 
@@ -124,7 +124,6 @@ def list_cmd(show_all: bool, date_str: str | None, tag: str | None) -> None:
         # created_at は ISO8601 形式なのでスペースで整形
         dt_raw = r.get("created_at", "")
         try:
-            from datetime import datetime
             dt = datetime.fromisoformat(dt_raw)
             dt_str = dt.strftime("%Y-%m-%d %H:%M")
         except ValueError:
@@ -183,7 +182,6 @@ def devices(set_name: str | None) -> None:
 @click.argument("memo_id", required=False, default=None)
 def transcribe(memo_id: str | None) -> None:
     """音声をテキストに変換する"""
-    from voice_memo.storage import read_meta
     from voice_memo.transcribe import transcribe_memo
 
     config = load_config()
