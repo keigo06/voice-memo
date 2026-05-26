@@ -205,3 +205,16 @@ class TestGetAudio:
         """GET /audio/{id} は不正な memo_id フォーマットに 400 を返す"""
         response = client.get("/audio/invalid_format")
         assert response.status_code == 400
+
+
+class TestConfigGuards:
+    def test_meta_dir_raises_runtime_error_when_config_not_set(self):
+        """_config が None のとき _meta_dir() は RuntimeError を送出する"""
+        import voice_memo.server as s
+        original = s._config
+        s._config = None
+        try:
+            with pytest.raises(RuntimeError, match="_config"):
+                s._meta_dir()
+        finally:
+            s._config = original

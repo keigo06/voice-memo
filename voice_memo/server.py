@@ -34,12 +34,14 @@ def _validate_memo_id(memo_id: str) -> None:
 # ---------------------------------------------------------------------------
 
 def _meta_dir() -> Path:
-    assert _config is not None
+    if _config is None:
+        raise RuntimeError("_config is not set; call run_server() first")
     return Path(_config.save_dir).expanduser() / "meta"
 
 
 def _audio_dir() -> Path:
-    assert _config is not None
+    if _config is None:
+        raise RuntimeError("_config is not set; call run_server() first")
     return Path(_config.save_dir).expanduser() / "audio"
 
 
@@ -159,7 +161,8 @@ def get_audio(memo_id: str):
 
 
 def _transcribe_job(memo_id: str) -> None:
-    assert _config is not None
+    if _config is None:
+        return
     meta_path = _meta_dir() / f"{memo_id}.memo.json"
     if not meta_path.exists():
         return
