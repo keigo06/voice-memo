@@ -28,3 +28,9 @@ whisper_prompt: ""          # 専門用語を渡すプロンプト
 # ホットキー（録音開始/停止トグル）
 # pynput 形式: <ctrl>+<alt>+r など
 # hotkey: "<ctrl>+<alt>+r"
+
+# --- 話者分離設定（pyannote.audio が必要: uv sync --extra diarize）---
+# 話者分離を使うには HuggingFace トークンが必要:
+# 1. https://huggingface.co/pyannote/speaker-diarization-3.1 で利用規約に同意
+# 2. https://huggingface.co/settings/tokens でトークンを作成（read 権限）
+# hf_token: "hf_xxxxxxxxxxxx"

@@ -71,6 +71,7 @@ class MemoUpdate(BaseModel):
 class TranscribeRequest(BaseModel):
     model: str | None = None
     accurate: bool = False
+    diarize: bool = False
 
 
 # ---------------------------------------------------------------------------
@@ -165,7 +166,7 @@ def get_audio(memo_id: str):
     )
 
 
-def _transcribe_job(memo_id: str, model: str | None = None, accurate: bool = False) -> None:
+def _transcribe_job(memo_id: str, model: str | None = None, accurate: bool = False, diarize: bool = False) -> None:
     if _config is None:
         return
     import copy
@@ -182,7 +183,7 @@ def _transcribe_job(memo_id: str, model: str | None = None, accurate: bool = Fal
         return
     wav_path = _audio_dir() / f"{memo_id}.memo.wav"
     try:
-        transcribe_memo(memo_id, wav_path, meta_path, cfg)
+        transcribe_memo(memo_id, wav_path, meta_path, cfg, diarize=diarize)
     except Exception:
         pass
 
@@ -198,11 +199,17 @@ def start_transcribe(memo_id: str, body: TranscribeRequest = TranscribeRequest()
     if data.get("transcript_status") == "processing":
         raise HTTPException(status_code=409, detail="already processing")
 
+    if body.diarize and (not _config or not _config.hf_token):
+        raise HTTPException(
+            status_code=422,
+            detail="話者分離には hf_token が必要です。config.yaml に設定してください。",
+        )
+
     data["transcript_status"] = "processing"
     write_meta(path, data)
 
     try:
-        _executor.submit(_transcribe_job, memo_id, body.model, body.accurate)
+        _executor.submit(_transcribe_job, memo_id, body.model, body.accurate, body.diarize)
     except Exception:
         data["transcript_status"] = "pending"
         write_meta(path, data)
@@ -364,6 +371,9 @@ _HTML = """<!DOCTYPE html>
       <option value="medium">medium</option>
       <option value="large-v3">large-v3</option>
     </select>
+    <label style="font-size:13px;display:flex;align-items:center;gap:4px;cursor:pointer;">
+      <input type="checkbox" id="diarize-check"> 話者分離
+    </label>
     <button class="btn btn-primary" id="transcribe-btn" onclick="startTranscribe()">文字起こし開始</button>
     <span id="transcribe-status" style="font-size:12px;color:#666;"></span>
     <button class="btn btn-danger" style="margin-left:auto;" onclick="deleteMemo()">削除</button>
@@ -451,7 +461,7 @@ async function openDetail(id) {
 
   document.getElementById('title-input').value = m.title || '';
   document.getElementById('audio-player').src = `/audio/${id}`;
-  document.getElementById('transcript-box').textContent = m.transcript || '-';
+  renderTranscript(m);
   document.getElementById('transcribe-status').textContent = '';
   renderTags(m.tags || []);
   updateTranscribeBtn(m.transcript_status);
@@ -540,13 +550,25 @@ document.getElementById('title-input').addEventListener('blur', async () => {
 // -----------------------------------------------------------------------
 // Transcribe
 // -----------------------------------------------------------------------
+function renderTranscript(m) {
+  const box = document.getElementById('transcript-box');
+  if (m.diarized_segments && m.diarized_segments.length > 0) {
+    box.innerHTML = m.diarized_segments.map(seg =>
+      '<div><strong>' + esc(seg.speaker) + '</strong>: ' + esc(seg.text) + '</div>'
+    ).join('');
+  } else {
+    box.textContent = m.transcript || '-';
+  }
+}
+
 async function startTranscribe() {
   if (!_currentId) return;
   const sel = document.getElementById('model-select').value;
+  const diarize = document.getElementById('diarize-check').checked;
   const body = sel === 'accurate'
-    ? { accurate: true }
-    : sel ? { model: sel }
-    : {};
+    ? { accurate: true, diarize }
+    : sel ? { model: sel, diarize }
+    : { diarize };
   const res = await fetch(`/api/transcribe/${_currentId}`, {
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },
@@ -566,7 +588,7 @@ function _startPolling(id) {
     const m = await res.json();
     if (m.id !== _currentId) { clearInterval(_pollTimer); _pollTimer = null; return; }
 
-    document.getElementById('transcript-box').textContent = m.transcript || '-';
+    renderTranscript(m);
     updateTranscribeBtn(m.transcript_status);
 
     if (m.transcript_status !== 'processing') {

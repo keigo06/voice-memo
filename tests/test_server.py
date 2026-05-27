@@ -187,6 +187,31 @@ class TestStartTranscribe:
         data = json.loads(path.read_text(encoding="utf-8"))
         assert data["transcript_status"] == "pending"
 
+    def test_post_api_transcribe_passes_diarize_flag(self, client, tmp_path, monkeypatch):
+        """diarize=True を POST すると _transcribe_job に diarize=True が渡される"""
+        import voice_memo.server as srv
+        from voice_memo.config import Config
+
+        srv._config = Config(save_dir=str(tmp_path), hf_token="dummy-token")
+        (tmp_path / "meta").mkdir(parents=True, exist_ok=True)
+        (tmp_path / "audio").mkdir(parents=True, exist_ok=True)
+
+        meta = {"id": "20240101_120000", "transcript_status": "pending", "tags": [], "title": ""}
+        (tmp_path / "meta" / "20240101_120000.memo.json").write_text(json.dumps(meta))
+
+        submitted = {}
+        def fake_submit(fn, *args, **kwargs):
+            submitted["args"] = args
+
+        monkeypatch.setattr(srv._executor, "submit", fake_submit)
+
+        response = client.post(
+            "/api/transcribe/20240101_120000",
+            json={"diarize": True},
+        )
+        assert response.status_code == 200
+        assert submitted["args"][3] is True  # diarize is the 4th positional arg
+
 
 def _make_wav(path: Path) -> None:
     """テスト用ダミー WAV ファイルを作成する"""
