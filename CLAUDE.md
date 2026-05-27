@@ -37,21 +37,22 @@ CLI（`vmemo`）と FastAPI ベースの Web UI を提供する。
 
 ## Git Workflow
 
-**ブランチ戦略:** Git Flow  
-`main`（タグ付きリリース）← `develop`（統合）← `feature/*` / `fix/*` / `refactor/*`
+**ブランチ戦略:** Trunk-based（Autoware 方式）  
+`main`（常にリリース可能）← `feature/*` / `fix/*` / `refactor/*`
 
-**通常のPR（→ develop）:**
+**PR（→ main）:**
 
-1. `gh pr create --base develop`
+1. `gh pr create --base main`
 2. CI が自動で `@copilot review` コメントを投稿
-3. 数分後にレビューを確認し対応（`/schedule 5m` でClaudeに返信させることも可能）
-4. `gh pr merge --squash`（スカッシュマージのみ許可）
+3. 数分後にレビューを確認し対応
+4. `gh pr merge --merge`（マージコミット。スカッシュは使わない）
 
-**リリース（develop → main）:**
+**リリース:**
 
-1. `gh pr create --base main --title "chore: release vX.Y.Z"`
-2. スカッシュマージ後: `git tag vX.Y.Z && git push origin vX.Y.Z`
-3. `release.yml` が GitHub Release を自動作成
+```bash
+git tag vX.Y.Z && git push origin vX.Y.Z
+```
+`release.yml` が GitHub Release を自動作成。PR は不要。
 
 ## Superpowers Overrides
 
