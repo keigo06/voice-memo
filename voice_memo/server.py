@@ -199,6 +199,12 @@ def start_transcribe(memo_id: str, body: TranscribeRequest = TranscribeRequest()
     if data.get("transcript_status") == "processing":
         raise HTTPException(status_code=409, detail="already processing")
 
+    if body.diarize and (not _config or not _config.hf_token):
+        raise HTTPException(
+            status_code=422,
+            detail="話者分離には hf_token が必要です。config.yaml に設定してください。",
+        )
+
     data["transcript_status"] = "processing"
     write_meta(path, data)
 

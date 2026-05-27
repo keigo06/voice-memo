@@ -208,6 +208,7 @@ def transcribe(memo_id: str | None, accurate: bool, model_name: str | None, diar
             "  詳細: https://huggingface.co/pyannote/speaker-diarization-3.1",
             err=True,
         )
+        return
 
     meta_dir = Path(config.save_dir).expanduser() / "meta"
     audio_dir = Path(config.save_dir).expanduser() / "audio"

@@ -59,6 +59,8 @@ def transcribe_memo(
         data["whisper_model"] = config.whisper_model
         if diarized_segs is not None:
             data["diarized_segments"] = diarized_segs
+        else:
+            data.pop("diarized_segments", None)
         write_meta(meta_path, data)
 
         return text

@@ -192,7 +192,7 @@ class TestStartTranscribe:
         import voice_memo.server as srv
         from voice_memo.config import Config
 
-        srv._config = Config(save_dir=str(tmp_path))
+        srv._config = Config(save_dir=str(tmp_path), hf_token="dummy-token")
         (tmp_path / "meta").mkdir(parents=True, exist_ok=True)
         (tmp_path / "audio").mkdir(parents=True, exist_ok=True)
 

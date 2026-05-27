@@ -203,3 +203,35 @@ class TestTranscribeMemo:
             mock_diarize.assert_not_called()
             data = read_meta(meta_path)
             assert "diarized_segments" not in data
+
+    def test_transcribe_memo_without_diarize_removes_stale_diarized_segments(self, tmp_path):
+        """diarize=False のとき既存の diarized_segments がメタデータから削除される"""
+        from voice_memo.config import Config
+        import json
+        meta_path = tmp_path / "memo.json"
+        wav_path = tmp_path / "memo.wav"
+        wav_path.touch()
+        # Pre-create meta with stale diarized_segments
+        stale = {
+            "id": "20240101_120000",
+            "unix_timestamp": 1704067200.0,
+            "transcript": "old",
+            "transcript_status": "done",
+            "diarized_segments": [{"speaker": "SPEAKER_00", "start": 0.0, "end": 3.0, "text": "old"}],
+            "tags": [],
+            "title": "",
+        }
+        meta_path.write_text(json.dumps(stale))
+
+        cfg = Config()
+
+        with patch("voice_memo.transcribe.WhisperModel") as MockModel, \
+             patch("voice_memo.transcribe.diarize_wav") as mock_diarize:
+            instance = MockModel.return_value
+            instance.transcribe.return_value = ([], MagicMock())
+
+            transcribe_memo("20240101_120000", wav_path, meta_path, cfg, diarize=False)
+
+            mock_diarize.assert_not_called()
+            data = read_meta(meta_path)
+            assert "diarized_segments" not in data

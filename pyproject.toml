@@ -25,7 +25,7 @@ dev = [
     "httpx",
 ]
 diarize = [
-    "pyannote.audio",
+    "pyannote.audio>=3.1",
 ]
 
 [project.scripts]
