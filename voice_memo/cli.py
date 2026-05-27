@@ -184,7 +184,9 @@ def devices(set_name: str | None) -> None:
               help="高精度モード: large-v3-turbo + beam_size=10 + VAD フィルタ")
 @click.option("--model", "model_name", default=None,
               help="使用するモデルを指定 (tiny/base/small/medium/large-v3-turbo/large-v3 など)")
-def transcribe(memo_id: str | None, accurate: bool, model_name: str | None) -> None:
+@click.option("--diarize", is_flag=True, default=False,
+              help="話者分離を実行する（pyannote.audio と HuggingFace トークンが必要）")
+def transcribe(memo_id: str | None, accurate: bool, model_name: str | None, diarize: bool) -> None:
     """音声をテキストに変換する"""
     from voice_memo.transcribe import transcribe_memo
 
@@ -198,6 +200,14 @@ def transcribe(memo_id: str | None, accurate: bool, model_name: str | None) -> N
 
     if model_name is not None:
         config.whisper_model = model_name
+
+    if diarize and not config.hf_token:
+        click.echo(
+            "警告: hf_token が設定されていません。\n"
+            "  config.yaml に hf_token を設定してください。\n"
+            "  詳細: https://huggingface.co/pyannote/speaker-diarization-3.1",
+            err=True,
+        )
 
     meta_dir = Path(config.save_dir).expanduser() / "meta"
     audio_dir = Path(config.save_dir).expanduser() / "audio"
@@ -236,7 +246,7 @@ def transcribe(memo_id: str | None, accurate: bool, model_name: str | None) -> N
         click.echo(f"処理中: {rid} ({duration:.1f}秒)...")
 
         try:
-            text = transcribe_memo(rid, wav_path, meta_path, config)
+            text = transcribe_memo(rid, wav_path, meta_path, config, diarize=diarize)
             click.echo(f"完了: 「{text.strip()}」")
             count += 1
         except Exception as e:
