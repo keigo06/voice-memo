@@ -1,6 +1,7 @@
 import json
 import logging
 import queue
+import sys
 import threading
 import time
 import wave
@@ -87,10 +88,12 @@ class AudioRecorder:
         try:
             import sounddevice as sd  # noqa: F401
         except ImportError:
+            if sys.platform == "win32":
+                extra = ""
+            else:
+                extra = "\n  sudo apt install libportaudio2"
             raise ImportError(
-                "sounddeviceが見つかりません。\n"
-                "  pip install sounddevice\n"
-                "  sudo apt install libportaudio2"
+                f"sounddeviceが見つかりません。\n  pip install sounddevice{extra}"
             )
 
         self._config = config
