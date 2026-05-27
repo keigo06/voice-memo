@@ -24,6 +24,9 @@ dev = [
     "pytest-cov",
     "httpx",
 ]
+diarize = [
+    "pyannote.audio",
+]
 
 [project.scripts]
 vmemo = "voice_memo.cli:main"

@@ -21,6 +21,7 @@ class Config:
     whisper_vad_filter: bool = False
     whisper_compute_type: str = "int8"
     hotkey: str = "<ctrl>+<alt>+r"
+    hf_token: str = ""
 
 
 def _repo_config() -> Path:
@@ -70,4 +71,5 @@ def load_config(path: Path | None = None) -> Config:
         whisper_vad_filter=raw.get("whisper_vad_filter", False),
         whisper_compute_type=raw.get("whisper_compute_type", "int8"),
         hotkey=raw.get("hotkey", "<ctrl>+<alt>+r"),
+        hf_token=raw.get("hf_token", ""),
     )
