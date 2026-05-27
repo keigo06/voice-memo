@@ -15,6 +15,7 @@ from pydantic import BaseModel
 from voice_memo.config import Config
 from voice_memo.storage import read_meta, write_meta
 from voice_memo.transcribe import transcribe_memo
+from voice_memo.summarize import summarize_memo
 
 app = FastAPI(title="voice-memo")
 
@@ -99,6 +100,7 @@ def list_memos(
             r for r in records
             if q_lower in r.get("title", "").lower()
             or q_lower in r.get("transcript", "").lower()
+            or q_lower in r.get("summary", "").lower()
             or any(q_lower in t.lower() for t in r.get("tags", []))
         ]
 
@@ -218,6 +220,23 @@ def start_transcribe(memo_id: str, body: TranscribeRequest = TranscribeRequest()
     return {"status": "queued"}
 
 
+@app.post("/api/summarize/{memo_id}")
+def summarize_endpoint(memo_id: str):
+    _validate_memo_id(memo_id)
+    path = _meta_dir() / f"{memo_id}.memo.json"
+    if not path.exists():
+        raise HTTPException(status_code=404, detail="memo not found")
+
+    try:
+        summary = summarize_memo(memo_id, path, _config)
+    except ValueError as e:
+        raise HTTPException(status_code=422, detail=str(e))
+    except ImportError as e:
+        raise HTTPException(status_code=503, detail=str(e))
+
+    return {"summary": summary}
+
+
 # ---------------------------------------------------------------------------
 # Port check and server entry point
 # ---------------------------------------------------------------------------
@@ -309,6 +328,8 @@ _HTML = """<!DOCTYPE html>
   .btn-primary:hover { background: #2471a3; }
   .btn-danger { background: #e74c3c; color: #fff; }
   .btn-danger:hover { background: #c0392b; }
+  .btn-secondary { background: #6c757d; color: white; }
+  .btn-secondary:hover { background: #5a6268; }
   .btn:disabled { opacity: 0.5; cursor: default; }
   .action-row { display: flex; gap: 10px; align-items: center; flex-wrap: wrap; }
   audio { width: 100%; margin-top: 4px; }
@@ -377,6 +398,14 @@ _HTML = """<!DOCTYPE html>
     <button class="btn btn-primary" id="transcribe-btn" onclick="startTranscribe()">文字起こし開始</button>
     <span id="transcribe-status" style="font-size:12px;color:#666;"></span>
     <button class="btn btn-danger" style="margin-left:auto;" onclick="deleteMemo()">削除</button>
+  </div>
+  <div class="detail-section">
+    <label>要約</label>
+    <div id="summary-box" style="background:#f9f9f9;border:1px solid #ddd;border-radius:4px;padding:10px;min-height:40px;font-size:13px;line-height:1.6;white-space:pre-wrap;word-break:break-word;">-</div>
+  </div>
+  <div class="action-row">
+    <button class="btn btn-secondary" id="summary-btn" onclick="startSummarize()">要約</button>
+    <span id="summary-status" style="font-size:12px;color:#666;"></span>
   </div>
 </div>
 
@@ -463,6 +492,8 @@ async function openDetail(id) {
   document.getElementById('audio-player').src = `/audio/${id}`;
   renderTranscript(m);
   document.getElementById('transcribe-status').textContent = '';
+  document.getElementById('summary-box').textContent = m.summary || '-';
+  document.getElementById('summary-status').textContent = '';
   renderTags(m.tags || []);
   updateTranscribeBtn(m.transcript_status);
 
@@ -578,6 +609,24 @@ async function startTranscribe() {
   document.getElementById('transcribe-status').textContent = 'キューに追加しました';
   updateTranscribeBtn('processing');
   _startPolling(_currentId);
+}
+
+async function startSummarize() {
+  if (!_currentId) return;
+  const btn = document.getElementById('summary-btn');
+  const status = document.getElementById('summary-status');
+  btn.disabled = true;
+  status.textContent = '要約中...';
+  const res = await fetch(`/api/summarize/${_currentId}`, { method: 'POST' });
+  btn.disabled = false;
+  if (!res.ok) {
+    const err = await res.json().catch(() => ({}));
+    status.textContent = 'エラー: ' + (err.detail || res.status);
+    return;
+  }
+  const data = await res.json();
+  document.getElementById('summary-box').textContent = data.summary;
+  status.textContent = '完了';
 }
 
 function _startPolling(id) {
