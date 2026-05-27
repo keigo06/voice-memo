@@ -48,3 +48,10 @@ class TestAssignSpeakers:
         """セグメントが空なら空リストを返す"""
         result = assign_speakers([], [(0.0, 5.0, "SPEAKER_00")])
         assert result == []
+
+    def test_segment_outside_all_diarization_spans_returns_unknown(self):
+        """セグメントが全 diarization スパンの外にある場合は UNKNOWN"""
+        segments = [{"start": 10.0, "end": 12.0, "text": "Late"}]
+        diarization = [(0.0, 5.0, "SPEAKER_00")]  # non-empty but no overlap
+        result = assign_speakers(segments, diarization)
+        assert result[0]["speaker"] == "UNKNOWN"

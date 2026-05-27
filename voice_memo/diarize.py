@@ -1,7 +1,4 @@
-import logging
 from pathlib import Path
-
-logger = logging.getLogger(__name__)
 
 
 def diarize_wav(wav_path: Path, hf_token: str) -> list[tuple[float, float, str]]:
@@ -21,7 +18,7 @@ def diarize_wav(wav_path: Path, hf_token: str) -> list[tuple[float, float, str]]
 
     pipeline = Pipeline.from_pretrained(
         "pyannote/speaker-diarization-3.1",
-        use_auth_token=hf_token or None,
+        token=hf_token or None,
     )
     result = pipeline(str(wav_path))
     return [
