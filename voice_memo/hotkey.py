@@ -37,7 +37,8 @@ class HotkeyRecorder:
             max_duration=self._config.memo_max_duration,
         )
         self._recorder = AudioRecorder(rec_config)
-        self._recorder.start()
+        save_dir = Path(self._config.save_dir).expanduser()
+        self._recorder.start(save_dir / "audio")
         self._is_recording = True
         logger.info("録音開始 (ホットキー)")
         # max_duration 後に自動停止するバックグラウンドスレッド
@@ -66,9 +67,8 @@ class HotkeyRecorder:
             logger.exception("録音の停止に失敗しました")
             return
 
-        duration_sec = len(memo.audio_data) / memo.sample_rate
+        duration_sec = memo.duration_sec
         save_dir = Path(self._config.save_dir).expanduser()
-        memo.save_wav(save_dir / "audio" / f"{memo.id}.memo.wav")
         memo.save_json(save_dir / "meta" / f"{memo.id}.memo.json", duration_sec)
         logger.info("録音保存: %s (%.1f秒)", memo.id, duration_sec)
         print(f"\n保存しました: {memo.id} ({duration_sec:.1f}秒)", flush=True)

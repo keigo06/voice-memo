@@ -35,7 +35,8 @@ def record() -> None:
 
     click.echo("録音中... Ctrl+Cで停止")
 
-    recorder.start()
+    save_dir = Path(config.save_dir).expanduser()
+    recorder.start(save_dir / "audio")
     start_time = time.time()
 
     stop_flag = threading.Event()
@@ -68,10 +69,7 @@ def record() -> None:
 
         memo = recorder.stop()
 
-        duration_sec = len(memo.audio_data) / memo.sample_rate
-
-        save_dir = Path(config.save_dir).expanduser()
-        memo.save_wav(save_dir / "audio" / f"{memo.id}.memo.wav")
+        duration_sec = memo.duration_sec
         memo.save_json(save_dir / "meta" / f"{memo.id}.memo.json", duration_sec)
 
         click.echo(f"保存しました: {memo.id} ({duration_sec:.1f}秒)")
