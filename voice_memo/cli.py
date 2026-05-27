@@ -378,3 +378,48 @@ def hotkey(hotkey_str: str | None) -> None:
     if hotkey_str is not None:
         config.hotkey = hotkey_str
     run_hotkey_listener(config)
+
+
+@main.command()
+@click.argument("memo_id", required=False, default=None)
+def summarize(memo_id: str | None) -> None:
+    """文字起こしを LLM で要約する"""
+    from voice_memo.summarize import summarize_memo
+
+    config = load_config()
+    meta_dir = Path(config.save_dir).expanduser() / "meta"
+
+    if not meta_dir.exists():
+        click.echo("メモがありません。")
+        return
+
+    if memo_id is not None:
+        meta_path = meta_dir / f"{memo_id}.memo.json"
+        if not meta_path.exists():
+            click.echo(f"エラー: メモが見つかりません: {memo_id}", err=True)
+            raise SystemExit(1)
+        paths = [meta_path]
+    else:
+        paths = []
+        for p in sorted(meta_dir.glob("*.memo.json")):
+            r = read_meta(p)
+            if r.get("transcript_status") == "done" and not r.get("summary"):
+                paths.append(p)
+
+    if not paths:
+        click.echo("処理対象のメモがありません。")
+        return
+
+    count = 0
+    for meta_path in paths:
+        rid = meta_path.name.replace(".memo.json", "")
+        click.echo(f"処理中: {rid}...")
+        try:
+            summary = summarize_memo(rid, meta_path, config)
+            preview = summary[:60] + "..." if len(summary) > 60 else summary
+            click.echo(f"完了: 「{preview}」")
+            count += 1
+        except Exception as e:
+            click.echo(f"失敗: {rid} ({e})", err=True)
+
+    click.echo(f"完了: {count}件処理しました")

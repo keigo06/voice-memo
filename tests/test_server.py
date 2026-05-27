@@ -255,3 +255,33 @@ class TestConfigGuards:
                 s._meta_dir()
         finally:
             s._config = original
+
+
+class TestSummarize:
+    def test_post_api_summarize_returns_summary_for_existing_id(self, client, tmp_path):
+        """文字起こし済みメモの要約が返される"""
+        meta_dir = tmp_path / "meta"
+        _make_meta_file(meta_dir, "20240101_120000", transcript="今日は晴れです。", transcript_status="done")
+
+        with patch("voice_memo.server.summarize_memo") as mock_summarize:
+            mock_summarize.return_value = "今日は晴れでした。"
+            response = client.post("/api/summarize/20240101_120000")
+
+        assert response.status_code == 200
+        assert response.json()["summary"] == "今日は晴れでした。"
+
+    def test_post_api_summarize_returns_404_for_nonexistent_id(self, client, tmp_path):
+        """存在しないメモは 404 を返す"""
+        (tmp_path / "meta").mkdir(parents=True, exist_ok=True)
+        response = client.post("/api/summarize/99991231_000000")
+        assert response.status_code == 404
+
+    def test_post_api_summarize_returns_422_when_no_transcript(self, client, tmp_path):
+        """文字起こしがないメモは 422 を返す"""
+        meta_dir = tmp_path / "meta"
+        _make_meta_file(meta_dir, "20240101_120000", transcript="", transcript_status="pending")
+
+        with patch("voice_memo.server.summarize_memo", side_effect=ValueError("文字起こしがありません")):
+            response = client.post("/api/summarize/20240101_120000")
+
+        assert response.status_code == 422

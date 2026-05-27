@@ -34,3 +34,8 @@ whisper_prompt: ""          # 専門用語を渡すプロンプト
 # 1. https://huggingface.co/pyannote/speaker-diarization-3.1 で利用規約に同意
 # 2. https://huggingface.co/settings/tokens でトークンを作成（read 権限）
 # hf_token: "hf_xxxxxxxxxxxx"
+
+# --- LLM 要約設定（anthropic が必要: uv sync --extra summarize）---
+# llm_provider: "anthropic"   # "anthropic" | "openai"
+# llm_model: ""               # 空文字=デフォルト (anthropic: claude-haiku-4-5-20251001, openai: gpt-4o-mini)
+# llm_api_key: ""             # 空文字=環境変数から取得 (ANTHROPIC_API_KEY / OPENAI_API_KEY)

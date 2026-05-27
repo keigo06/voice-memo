@@ -22,6 +22,9 @@ class Config:
     whisper_compute_type: str = "int8"
     hotkey: str = "<ctrl>+<alt>+r"
     hf_token: str = ""
+    llm_provider: str = "anthropic"
+    llm_model: str = ""
+    llm_api_key: str = ""
 
 
 def _repo_config() -> Path:
@@ -72,4 +75,7 @@ def load_config(path: Path | None = None) -> Config:
         whisper_compute_type=raw.get("whisper_compute_type", "int8"),
         hotkey=raw.get("hotkey", "<ctrl>+<alt>+r"),
         hf_token=raw.get("hf_token", ""),
+        llm_provider=raw.get("llm_provider", "anthropic"),
+        llm_model=raw.get("llm_model", ""),
+        llm_api_key=raw.get("llm_api_key", ""),
     )
