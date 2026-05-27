@@ -42,7 +42,10 @@ def _summarize_anthropic(text: str, config: Config) -> str:
         max_tokens=1024,
         messages=[{"role": "user", "content": _SUMMARIZE_PROMPT + text}],
     )
-    return message.content[0].text
+    block = message.content[0]
+    if not hasattr(block, "text"):
+        raise ValueError(f"予期しないレスポンス型: {type(block)}")
+    return block.text
 
 
 def _summarize_openai(text: str, config: Config) -> str:
@@ -67,7 +70,10 @@ def _summarize_openai(text: str, config: Config) -> str:
         model=model,
         messages=[{"role": "user", "content": _SUMMARIZE_PROMPT + text}],
     )
-    return response.choices[0].message.content
+    content = response.choices[0].message.content
+    if content is None:
+        raise ValueError("OpenAI から空のレスポンスが返されました。")
+    return content
 
 
 def summarize_memo(memo_id: str, meta_path: Path, config: Config) -> str:
@@ -91,7 +97,6 @@ def summarize_memo(memo_id: str, meta_path: Path, config: Config) -> str:
 
     summary = summarize_text(text, config)
 
-    data = read_meta(meta_path)
     data["summary"] = summary
     write_meta(meta_path, data)
     return summary
