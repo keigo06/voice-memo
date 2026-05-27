@@ -40,19 +40,35 @@ CLI（`vmemo`）と FastAPI ベースの Web UI を提供する。
 **ブランチ戦略:** Trunk-based（Autoware 方式）  
 `main`（常にリリース可能）← `feature/*` / `fix/*` / `refactor/*`
 
-**PR（→ main）:**
-
-1. `gh pr create --base main`
-2. CI が自動で `@copilot review` コメントを投稿
-3. 数分後にレビューを確認し対応
-4. `gh pr merge --merge`（マージコミット。スカッシュは使わない）
-
-**リリース:**
+### 開発フロー
 
 ```bash
-git tag vX.Y.Z && git push origin vX.Y.Z
+# 1. ブランチを切る
+git checkout -b feature/xxx   # または fix/xxx / refactor/xxx
+
+# 2. 実装・コミット（Conventional Commits）
+git commit -m "feat: add xxx"
+git push -u origin feature/xxx
+
+# 3. PR を作成
+gh pr create --base main --title "feat: add xxx"
+# → CI が自動で @copilot review を投稿（copilot-review.yml）
+# → 数分待ってレビューを確認・対応
+
+# 4. マージ（スカッシュなし）
+gh pr merge --merge --delete-branch
 ```
-`release.yml` が GitHub Release を自動作成。PR は不要。
+
+### リリースフロー
+
+```bash
+# タグを打つだけ（PR 不要）
+git tag v0.6.0
+git push origin v0.6.0
+# → release.yml が GitHub Release を自動作成
+```
+
+**Conventional Commits:** `feat:` / `fix:` / `refactor:` / `chore:` / `docs:` / `test:`
 
 ## Superpowers Overrides
 
