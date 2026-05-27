@@ -7,7 +7,7 @@ device_name: null
 # 録音設定
 sample_rate: 16000          # Whisper推奨値
 channels: 1                 # モノラル（音声認識に十分）
-memo_max_duration: 300      # メモモード最大録音秒数（安全装置）
+memo_max_duration: 300      # 最大録音秒数（安全装置）。会議録音など長時間用途は 7200（2時間）に変更
 
 # Web UIサーバー
 server_port: 8765
