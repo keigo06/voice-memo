@@ -2,8 +2,8 @@
 
 ## Project Overview
 
-音声メモアプリ。音声の録音・検索・文字起こしができる。
-CLI（`vmemo`）と FastAPI ベースの Web UI を提供する。
+音声メモアプリ。音声の録音・検索・文字起こし・話者分離・LLM 要約ができる。
+CLI（`vmemo`）と FastAPI ベースの Web UI を提供する。長時間録音（会議議事録など）にも対応。
 文字起こしはリアルタイムではなく、後から選んだ音声ファイルに対して処理する。
 データ構造は将来の ROS メッセージ変換を考慮してフラットに保つ。
 
@@ -12,7 +12,8 @@ CLI（`vmemo`）と FastAPI ベースの Web UI を提供する。
 - Python 3.10+
 - Click（CLI）/ FastAPI + uvicorn（Web UI）
 - sounddevice（録音）/ faster-whisper（文字起こし）
-- filelock / PyYAML
+- pynput（ホットキー）/ filelock / PyYAML
+- pyannote.audio（話者分離、オプション）/ anthropic（LLM 要約、オプション）
 
 ## Commands
 
@@ -26,14 +27,19 @@ CLI（`vmemo`）と FastAPI ベースの Web UI を提供する。
 - 音声ファイル: `{save_dir}/audio/{id}.memo.wav`
 - メタデータ: `{save_dir}/meta/{id}.memo.json`
 - `transcript_status` の遷移: `pending → processing → done | failed`
+- オプションフィールド: `diarized_segments`（話者分離結果）/ `summary`（LLM 要約）
+- 録音は WAV にストリーム書き込み（メモリ蓄積なし）。`duration_sec` は経過時間から算出
 - 設定優先順位: CLI引数 > `~/voice-memo/config.yaml` > リポジトリの `config.yaml`
 
 ## Key Files
 
-- `voice_memo/recorder.py` — `MemoRecord`（保存データ構造）と `AudioRecorder`
+- `voice_memo/recorder.py` — `MemoRecord`（保存データ構造）と `AudioRecorder`（WAV ストリーム書き込み）
 - `voice_memo/config.py` — `Config` dataclass とファイルローダー
 - `voice_memo/server.py` — FastAPI エンドポイント + インライン HTML フロントエンド
-- `voice_memo/cli.py` — Click CLI コマンド群（`record` / `list` / `transcribe` / `server` 他）
+- `voice_memo/cli.py` — Click CLI コマンド群（`record` / `list` / `transcribe` / `summarize` / `server` 他）
+- `voice_memo/hotkey.py` — グローバルホットキーによる録音トグル
+- `voice_memo/diarize.py` — 話者分離（pyannote.audio ラッパー）
+- `voice_memo/summarize.py` — LLM 要約（Anthropic / OpenAI）
 
 ## Git Workflow
 
@@ -55,7 +61,7 @@ gh pr create --base main --title "feat: add xxx"
 # → CI が自動で @copilot review を投稿（copilot-review.yml）
 # → 数分待ってレビューを確認・対応
 
-# 4. マージ（スカッシュ）
+# 4. マージ（スカッシュ）— --subject は付けない（GitHub がタイトル+(#N)を自動生成する）
 gh pr merge --squash --delete-branch
 ```
 
@@ -63,8 +69,8 @@ gh pr merge --squash --delete-branch
 
 ```bash
 # タグを打つだけ（PR 不要）
-git tag v0.6.0
-git push origin v0.6.0
+git tag v0.9.0
+git push origin v0.9.0
 # → release.yml が GitHub Release を自動作成
 ```
 
