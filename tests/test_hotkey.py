@@ -50,7 +50,7 @@ class TestHotkeyRecorder:
             assert not recorder.is_recording
 
     def test_saved_files_exist_after_stop(self, tmp_path):
-        """録音停止後に .memo.wav と .memo.json が保存される"""
+        """録音停止後に .memo.json が保存される（WAV はストリーミング録音中に書き込まれる）"""
         from voice_memo.hotkey import HotkeyRecorder
         from voice_memo.config import Config
 
@@ -65,7 +65,5 @@ class TestHotkeyRecorder:
             recorder.toggle()
             recorder.toggle()
 
-        wav = tmp_path / "audio" / "20240101_120000.memo.wav"
         meta = tmp_path / "meta" / "20240101_120000.memo.json"
-        assert wav.exists()
         assert meta.exists()
