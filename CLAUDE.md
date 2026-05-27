@@ -55,8 +55,8 @@ gh pr create --base main --title "feat: add xxx"
 # → CI が自動で @copilot review を投稿（copilot-review.yml）
 # → 数分待ってレビューを確認・対応
 
-# 4. マージ（スカッシュなし）
-gh pr merge --merge --delete-branch
+# 4. マージ（スカッシュ）
+gh pr merge --squash --delete-branch
 ```
 
 ### リリースフロー
@@ -69,6 +69,9 @@ git push origin v0.6.0
 ```
 
 **Conventional Commits:** `feat:` / `fix:` / `refactor:` / `chore:` / `docs:` / `test:`
+
+> **なぜスカッシュ OK？** develop→main の「2段階スカッシュ」が今回のコンフリクトの原因だった。
+> feature→main の1段階だけなら main は常に feature の FF 先なのでコンフリクトは発生しない。
 
 ## Superpowers Overrides
 
