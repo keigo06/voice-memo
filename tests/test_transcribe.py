@@ -7,6 +7,7 @@ from unittest.mock import MagicMock, patch
 import pytest
 
 from voice_memo.config import Config
+from voice_memo.storage import read_meta
 from voice_memo.transcribe import transcribe_memo
 
 
@@ -148,3 +149,57 @@ class TestTranscribeMemo:
             transcribe_memo("20240101_120000", wav_path, meta_path, cfg)
 
             MockModel.assert_called_once_with("large-v3", device="cpu", compute_type="float16")
+
+    def test_transcribe_memo_with_diarize_stores_diarized_segments(self, tmp_path):
+        """diarize=True のとき diarized_segments がメタデータに保存される"""
+        from voice_memo.config import Config
+        meta_path = tmp_path / "memo.json"
+        wav_path = tmp_path / "memo.wav"
+        wav_path.touch()
+        _make_meta(meta_path)
+
+        cfg = Config()
+
+        fake_segment = MagicMock()
+        fake_segment.start = 0.0
+        fake_segment.end = 3.0
+        fake_segment.text = "テスト"
+
+        with patch("voice_memo.transcribe.WhisperModel") as MockModel, \
+             patch("voice_memo.transcribe.diarize_wav") as mock_diarize, \
+             patch("voice_memo.transcribe.assign_speakers") as mock_assign:
+            instance = MockModel.return_value
+            instance.transcribe.return_value = ([fake_segment], MagicMock())
+            mock_diarize.return_value = [(0.0, 3.0, "SPEAKER_00")]
+            mock_assign.return_value = [
+                {"speaker": "SPEAKER_00", "start": 0.0, "end": 3.0, "text": "テスト"}
+            ]
+
+            transcribe_memo("20240101_120000", wav_path, meta_path, cfg, diarize=True)
+
+            mock_diarize.assert_called_once()
+            mock_assign.assert_called_once()
+            data = read_meta(meta_path)
+            assert "diarized_segments" in data
+            assert data["diarized_segments"][0]["speaker"] == "SPEAKER_00"
+
+    def test_transcribe_memo_without_diarize_does_not_store_diarized_segments(self, tmp_path):
+        """diarize=False のとき diarized_segments は保存されない"""
+        from voice_memo.config import Config
+        meta_path = tmp_path / "memo.json"
+        wav_path = tmp_path / "memo.wav"
+        wav_path.touch()
+        _make_meta(meta_path)
+
+        cfg = Config()
+
+        with patch("voice_memo.transcribe.WhisperModel") as MockModel, \
+             patch("voice_memo.transcribe.diarize_wav") as mock_diarize:
+            instance = MockModel.return_value
+            instance.transcribe.return_value = ([], MagicMock())
+
+            transcribe_memo("20240101_120000", wav_path, meta_path, cfg, diarize=False)
+
+            mock_diarize.assert_not_called()
+            data = read_meta(meta_path)
+            assert "diarized_segments" not in data

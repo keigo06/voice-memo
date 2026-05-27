@@ -4,6 +4,7 @@ from pathlib import Path
 from faster_whisper import WhisperModel
 
 from voice_memo.config import Config
+from voice_memo.diarize import assign_speakers, diarize_wav
 from voice_memo.storage import read_meta, write_meta
 
 logger = logging.getLogger(__name__)
@@ -14,9 +15,11 @@ def transcribe_memo(
     wav_path: Path,
     meta_path: Path,
     config: Config,
+    diarize: bool = False,
 ) -> str:
     """
     WAVファイルを文字起こしして、JSONメタデータを更新する。
+    diarize=True のとき話者分離も実行して diarized_segments を保存する。
     戻り値: 文字起こし結果のテキスト
     """
     data = read_meta(meta_path)
@@ -30,7 +33,6 @@ def transcribe_memo(
             compute_type=config.whisper_compute_type,
         )
 
-        # 空文字列は initial_prompt に渡すと挙動が変わるため None に変換
         initial_prompt = config.whisper_prompt or None
 
         segments, _info = model.transcribe(
@@ -41,13 +43,22 @@ def transcribe_memo(
             vad_filter=config.whisper_vad_filter,
         )
 
-        # segments はジェネレータなので全件消費してから結合
-        text = "".join(seg.text for seg in segments)
+        if diarize:
+            seg_list = list(segments)
+            text = "".join(seg.text for seg in seg_list)
+            seg_dicts = [{"start": s.start, "end": s.end, "text": s.text} for s in seg_list]
+            diarization = diarize_wav(wav_path, config.hf_token)
+            diarized_segs = assign_speakers(seg_dicts, diarization)
+        else:
+            text = "".join(seg.text for seg in segments)
+            diarized_segs = None
 
         data = read_meta(meta_path)
         data["transcript"] = text
         data["transcript_status"] = "done"
         data["whisper_model"] = config.whisper_model
+        if diarized_segs is not None:
+            data["diarized_segments"] = diarized_segs
         write_meta(meta_path, data)
 
         return text
