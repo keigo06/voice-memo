@@ -62,6 +62,19 @@ class TestMemoRecordSaveWav:
         assert samples[1] == -32768 or samples[1] == -32767
         assert abs(samples[2] - 16383) <= 1
 
+    def test_save_wav_is_noop_when_audio_data_is_empty(self, tmp_path):
+        """audio_data が空のとき save_wav は WAV ファイルを作成しない（既にディスク書き込み済み）"""
+        memo = MemoRecord(
+            id="20240101_120000",
+            unix_timestamp=1704067200.0,
+            audio_data=np.zeros(0, dtype=np.float32),
+            sample_rate=16000,
+            created_at=datetime(2024, 1, 1, 12, 0, 0, tzinfo=timezone.utc),
+        )
+        wav_path = tmp_path / "should_not_exist.wav"
+        memo.save_wav(wav_path)
+        assert not wav_path.exists()
+
 
 class TestMemoRecordSaveJson:
     def test_save_json_creates_file_with_pending_status(self, tmp_path):

@@ -1,6 +1,5 @@
 import json
 import logging
-import queue
 import sys
 import threading
 import time
@@ -30,14 +29,17 @@ class MemoRecord:
     sample_rate: int
     created_at: datetime
     channels: int = 1
+    duration_sec: float = 0.0
 
     def save_wav(self, path: Path) -> None:
-        """PCM 16bit WAV として保存"""
+        """PCM 16bit WAV として保存。audio_data が空なら（既にディスク書き込み済み）スキップ。"""
+        if self.audio_data.size == 0:
+            return
         path.parent.mkdir(parents=True, exist_ok=True)
         pcm = (self.audio_data * 32767).clip(-32768, 32767).astype(np.int16)
         with wave.open(str(path), "wb") as wf:
             wf.setnchannels(self.channels)
-            wf.setsampwidth(2)  # 16bit = 2 bytes
+            wf.setsampwidth(2)
             wf.setframerate(self.sample_rate)
             wf.writeframes(pcm.tobytes())
 
@@ -97,19 +99,32 @@ class AudioRecorder:
             )
 
         self._config = config
-        self._queue: queue.Queue[np.ndarray] = queue.Queue()
         self._stream = None
         self._timer: threading.Timer | None = None
         self._stop_event = threading.Event()
         self._start_time: float = 0.0
+        self._wav_writer: wave.Wave_write | None = None
+        self._wav_lock = threading.Lock()
+        self._memo_id: str = ""
 
-    def start(self) -> None:
-        """sd.InputStream を開始。コールバックでチャンクをキューに積む。最大時間タイマーをセット。"""
+    def start(self, wav_dir: Path) -> None:
+        """録音開始。PCM を wav_dir/{memo_id}.memo.wav に直接ストリーム書き込みする。"""
         import sounddevice as sd
 
         self._stop_event.clear()
         device_index = find_device(self._config.device_name)
         self._start_time = time.time()
+
+        created_at = datetime.fromtimestamp(self._start_time, tz=timezone.utc).astimezone()
+        self._memo_id = created_at.strftime("%Y%m%d_%H%M%S")
+
+        wav_dir.mkdir(parents=True, exist_ok=True)
+        wav_path = wav_dir / f"{self._memo_id}.memo.wav"
+
+        self._wav_writer = wave.open(str(wav_path), "wb")
+        self._wav_writer.setnchannels(self._config.channels)
+        self._wav_writer.setsampwidth(2)  # 16bit = 2 bytes
+        self._wav_writer.setframerate(self._config.sample_rate)
 
         self._stream = sd.InputStream(
             device=device_index,
@@ -120,7 +135,6 @@ class AudioRecorder:
         )
         self._stream.start()
 
-        # 最大録音時間の強制停止イベントをセット
         self._timer = threading.Timer(
             self._config.max_duration, self._stop_event.set
         )
@@ -128,12 +142,15 @@ class AudioRecorder:
         self._timer.start()
 
         logger.info(
-            f"録音開始: device={self._config.device_name}, "
-            f"rate={self._config.sample_rate}, max={self._config.max_duration}s"
+            "録音開始: device=%s, rate=%d, max=%ds, path=%s",
+            self._config.device_name,
+            self._config.sample_rate,
+            self._config.max_duration,
+            wav_path,
         )
 
     def stop(self) -> MemoRecord:
-        """InputStream を停止し、キューをフラッシュして MemoRecord を返す"""
+        """録音停止。WAV ファイルをクローズして MemoRecord を返す。audio_data は空（ディスク保存済み）。"""
         if self._start_time == 0.0:
             ts = time.time()
             created_at = datetime.fromtimestamp(ts, tz=timezone.utc).astimezone()
@@ -156,32 +173,25 @@ class AudioRecorder:
 
         elapsed = time.time() - self._start_time
 
-        # キューを全フラッシュ（末尾の欠損を防ぐ）
-        chunks: list[np.ndarray] = []
-        while not self._queue.empty():
-            try:
-                chunks.append(self._queue.get_nowait())
-            except queue.Empty:
-                break
-
-        if chunks:
-            audio_data = np.concatenate(chunks, axis=0).flatten()
-        else:
-            audio_data = np.zeros(0, dtype=np.float32)
+        with self._wav_lock:
+            if self._wav_writer is not None:
+                self._wav_writer.close()
+                self._wav_writer = None
 
         ts = self._start_time
         created_at = datetime.fromtimestamp(ts, tz=timezone.utc).astimezone()
-        memo_id = created_at.strftime("%Y%m%d_%H%M%S")
+        memo_id = self._memo_id
 
-        logger.info(f"録音停止: id={memo_id}, duration={elapsed:.1f}s, samples={len(audio_data)}")
+        logger.info("録音停止: id=%s, duration=%.1fs", memo_id, elapsed)
 
         return MemoRecord(
             id=memo_id,
             unix_timestamp=ts,
-            audio_data=audio_data,
+            audio_data=np.zeros(0, dtype=np.float32),
             sample_rate=self._config.sample_rate,
             created_at=created_at,
             channels=self._config.channels,
+            duration_sec=elapsed,
         )
 
     @property
@@ -191,5 +201,8 @@ class AudioRecorder:
 
     def _callback(self, indata: np.ndarray, frames: int, time_info, status) -> None:
         if status:
-            logger.warning(f"録音ステータス異常: {status}")
-        self._queue.put(indata.copy())
+            logger.warning("録音ステータス異常: %s", status)
+        pcm = (indata * 32767).clip(-32768, 32767).astype(np.int16)
+        with self._wav_lock:
+            if self._wav_writer is not None:
+                self._wav_writer.writeframes(pcm.tobytes())
